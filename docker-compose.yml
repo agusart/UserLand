@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  userland-app:
+    container_name: userland
+    build: .
+    ports:
+      - 8080:8080
+    restart: on-failure
+    volumes:
+      - ./:/app
+    depends_on:
+      - userland-db
+      - userland-redis-server
+    networks:
+      - net
+
+  userland-db:
+    image: postgres:10-alpine
+    volumes:
+      - db_data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    env_file: .env
+    networks:
+      - net
+
+  userland-admin:
+    image: adminer
+    restart: always
+    networks:
+      - net
+    depends_on:
+      - userland-db
+    ports:
+      - "8090:8080"
+
+  userland-redis-server:
+    image: "redis:alpine"
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "6379:6379"
+    networks:
+      - net
+    env_file: .env
+    volumes:
+      - redis_data:/data
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  redis_data:
+  db_data:
