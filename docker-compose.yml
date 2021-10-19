@@ -6,7 +6,7 @@ services:
     build: .
     ports:
       - 8080:8080
-    restart: on-failure
+#    restart: on-failure
     volumes:
       - ./:/app
     depends_on:
