@@ -68,12 +68,13 @@ func GenerateErrorResponse(err error) ErrorResponse {
 	)
 
 	switch err.(type) {
-	case ErrUserAlreadyRegistered:
-		errCode = api.ErrUserAlreadyRegistered
-		errMsg = err.Error()
+	case postgres.CustomErrorInterface:
+		customError := err.(postgres.CustomErrorInterface)
+		errMsg = customError.Error()
+		errCode = customError.GetErrorCode()
 		break
-	case error:
-		errCode = api.ErrInternalServerError
+	default:
+		errCode = api.ErrInternalServerErrorCode
 		errMsg = "internal server error"
 		break
 	}

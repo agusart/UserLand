@@ -1,0 +1,1 @@
+drop table if exists tfa_backup_code;

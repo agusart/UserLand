@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"github.com/go-chi/chi/v5"
 	"userland/api/auth"
 	"userland/store/postgres"
@@ -9,22 +10,22 @@ import (
 
 var router *chi.Mux
 
-func InitServer() *chi.Mux {
+func InitServer(db *sql.DB) *chi.Mux {
 	if router != nil{
 		return router
 	}
 
-	db := postgres.NewDatabase()
+
 	redisClient := redis.InitRedisDb()
 	cache := redis.NewRedisCacheStore(redisClient)
-
-	userStore := postgres.NewUserStore(db, cache)
-
+	authStore := postgres.NewAuthStore(cache)
+	userStore := postgres.NewUserStore(db)
 	router = chi.NewMux()
 
 	router.Route("/auth", func(r chi.Router) {
-		router.Post("/register", auth.Register(userStore))
-		router.Post("/verification", auth.Verification(userStore))
+		r.Post("/register", auth.Register(userStore, authStore))
+		r.Post("/verification", auth.RequestVerification(userStore, authStore))
+		r.Get("/verify/{token}", auth.VerifyRegister(userStore, authStore))
 	})
 
 	return router

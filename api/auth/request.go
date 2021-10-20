@@ -9,11 +9,6 @@ type RegisterRequest struct {
 	PasswordConfirm string `json:"password_confirm"`
 }
 
-type VerificationRequest struct {
-	Type      string `json:"type"`
-	Recipient string `json:"recipient"`
-}
-
 func (r RegisterRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
@@ -37,16 +32,58 @@ func (r RegisterRequest) Validate() map[string]string {
 	return errorMsg
 }
 
+type RegisterVerificationRequest struct {
+	Type      string `json:"type"`
+	Recipient string `json:"recipient"`
+}
 
-func (r VerificationRequest) Validate() map[string]string {
+func (r RegisterVerificationRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
 	if !isValidEmail(r.Recipient) {
-		errorMsg["email"] = "Email is invalid"
+		errorMsg["recepient"] = "recepient is invalid"
 	}
 
 	if r.Type != api.ActionVerifyEmail {
-		errorMsg["email"] = "invalid type"
+		errorMsg["type"] = "invalid type"
+	}
+
+	return errorMsg
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+func (f ForgotPasswordRequest) Validate() map[string]string {
+	errorMsg := make(map[string]string)
+
+	if !isValidEmail(f.Email) {
+		errorMsg["email"] = "invalid email format"
+	}
+
+	return errorMsg
+}
+
+type ResetPasswordRequest struct {
+	 Token string `json:"token"`
+	 Password string `json:"password"`
+	 PasswordConfirm string `json:"password_confirm"`
+}
+
+func (r ResetPasswordRequest) Validate() map[string]string {
+	errorMsg := make(map[string]string)
+
+	if r.Token != "" {
+		errorMsg["token"] = "token should not be empty"
+	}
+
+	if !isValidPassword(r.Password) {
+		errorMsg["password"] = "password is weak"
+	}
+
+	if r.Password != r.PasswordConfirm {
+		errorMsg["password_confirm"] = "password confirm not match"
 	}
 
 	return errorMsg

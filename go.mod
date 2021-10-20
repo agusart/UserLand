@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/alicebob/miniredis v2.5.0+incompatible
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/go-chi/chi/v5 v5.0.4
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/golang-migrate/migrate v3.5.4+incompatible // indirect
