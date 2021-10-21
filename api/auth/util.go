@@ -71,7 +71,7 @@ func GenerateErrorResponse(err error) ErrorResponse {
 	case postgres.CustomErrorInterface:
 		customError := err.(postgres.CustomErrorInterface)
 		errMsg = customError.Error()
-		errCode = customError.GetErrorCode()
+		errCode = customError.GetDatabaseErrorCode()
 		break
 	default:
 		errCode = api.ErrInternalServerErrorCode
@@ -79,7 +79,7 @@ func GenerateErrorResponse(err error) ErrorResponse {
 		break
 	}
 
-	return ErrorResponse{
+	return ErrorResponse {
 		Code: errCode,
 		Message: errMsg,
 	}

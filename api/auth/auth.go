@@ -6,12 +6,100 @@ import (
 	"log"
 	"net/http"
 	"userland/api"
+	"userland/api/middleware"
 	"userland/store/postgres"
 )
 
-func Login(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+func Login(
+	userStore postgres.UserStoreInterface,
+	jwt middleware.JwtHandlerInterface,
+	sessionStore postgres.SessionStoreInterface,
+	authStore postgres.AuthStoreInterface,
+	) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		loginRequest := LoginRequest{}
+		_ = json.NewDecoder(r.Body).Decode(&loginRequest)
 
+		if errMsg := loginRequest.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(Response{
+				"fields": errMsg,
+			})
+			return
+		}
+
+		loginUser, err := userStore.GetUserByEmail(loginRequest.Email)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		if !CheckPasswordHash(loginRequest.Password, loginUser.Password){
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(ErrorResponse{
+				Code: api.ErrWringPasswordCode,
+				Message: "incorrect password",
+			})
+			return
+		}
+
+		session, err := sessionStore.GetSessionByUserId(loginUser.Id)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		if session == nil {
+			session, err = sessionStore.CreateNewSession(loginUser.Id)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+				return
+			}
+		}
+
+
+		var accessToken *middleware.JWTToken
+
+		accessToken, err = jwt.GenerateAccessToken(loginUser.Id, session.Id)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		if !loginUser.TfaEnabled {
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(LoginResponse{
+				RequireTfa: loginUser.TfaEnabled,
+				Token: *accessToken,
+			})
+		}
+
+		tfaToken, err := authStore.SendTfaVerificationCode(r.Context(), loginUser.Email, api.TfaExpiredTime)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		success := api.SendTfaEmail(loginUser.Email, tfaToken)
+		if !success {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(ErrorResponse{
+				Code: "ERR_TFA",
+				Message: "cant send tfa code",
+			})
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(LoginResponse{
+			RequireTfa: loginUser.TfaEnabled,
+			Token: *accessToken,
+		})
 	}
 }
 
@@ -110,33 +198,25 @@ func VerifyRegister(userStore postgres.UserStoreInterface, authStore postgres.Au
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
 		if token == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(Response{
-				"code" : "ERR-11",
-				"messages" : "error link",
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(ErrorResponse{
+				api.ErrBadRequestErrorCode,
+				"please provide token",
 			})
-
 			return
 		}
 
 		email, err := authStore.GetRegistrationCodeEmail(r.Context(), token)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(Response{
-				"code" : "ERR-",
-				"messages" : "error link",
-			})
+			_ = json.NewEncoder(w).Encode(err)
 			return
 		}
 
 		err = userStore.VerifyUser(email)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(Response{
-				"code" : "ERR-",
-				"messages" : "error link",
-			})
-
+			_ = json.NewEncoder(w).Encode(err)
 			return
 		}
 
@@ -217,40 +297,28 @@ func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.Aut
 
 		email, err := authStore.GetResetPasswordCodeEmail(r.Context(), request.Token)
 		if err != nil {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = json.NewEncoder(w).Encode(ErrorResponse{
-				"-",
-				"-",
-			})
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
 			return
 		}
 
-		exsistingUser, err := userStore.GetUserByEmail(email)
+		existingUser, err := userStore.GetUserByEmail(email)
 		if err != nil {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = json.NewEncoder(w).Encode(ErrorResponse{
-				"-",
-				"-",
-			})
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
 			return
 		}
 
-		if exsistingUser == nil {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = json.NewEncoder(w).Encode(ErrorResponse{
-				"-",
-				"-",
-			})
+		if existingUser == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		err = userStore.UpdateUserPassword(exsistingUser.Id, request.Password)
+		err = userStore.UpdateUserPassword(existingUser.Id, request.Password)
 		if err != nil {
-			_ = json.NewEncoder(w).Encode(ErrorResponse{
-				"-",
-				"-",
-			})
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
 			return
 		}
 
@@ -261,14 +329,96 @@ func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.Aut
 }
 
 
-func VerifyTfa(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+func VerifyTfa(
+	jwt middleware.JwtHandlerInterface,
+	sessionStore postgres.SessionStoreInterface,
+	) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		verifyTfaRequest := VerifyTfaRequest{}
+		_ = json.NewEncoder(w).Encode(&verifyTfaRequest)
 
+		if errMsg := verifyTfaRequest.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(Response{
+				"fields": errMsg,
+			})
+			return
+		}
+
+		userId := r.Context().Value(api.ContextUserIdKey).(uint)
+		userSession, err := sessionStore.GetSessionByUserId(userId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		tokenWithTfa, err  :=jwt.GenerateAccessTokenTfa(userId, userSession.Id)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(Response{
+			"access_token" : tokenWithTfa,
+		})
 	}
 }
 
-func BypassTfa(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+func BypassTfa(
+	jwt middleware.JwtHandlerInterface,
+	sessionStore postgres.SessionStoreInterface,
+	tfaStore postgres.TfaStoreInterface,
+	) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bypassTfaRequest := VerifyTfaRequest{}
+		_ = json.NewEncoder(w).Encode(&bypassTfaRequest)
 
+		if errMsg := bypassTfaRequest.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(Response{
+				"fields": errMsg,
+			})
+			return
+		}
+
+		userId := r.Context().Value(api.ContextUserIdKey).(uint)
+		userSession, err := sessionStore.GetSessionByUserId(userId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		success, err := tfaStore.CheckTfaBackupCode(userId, bypassTfaRequest.Code)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		if !success {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(ErrorResponse{
+				Code : "ER-xx",
+				Message: "Code is incorrect",
+			})
+			return
+		}
+
+		tokenWithTfa, err  :=jwt.GenerateAccessTokenTfa(userId, userSession.Id)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(GenerateErrorResponse(err))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(Response{
+			"access_token" : tokenWithTfa,
+		})
 	}
 }

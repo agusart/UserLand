@@ -13,12 +13,13 @@ type AuthStoreInterface interface {
 	GetRegistrationCodeEmail(ctx context.Context, registrationToken string) (string, error)
 	SendForgotPasswordVerificationCode(ctx context.Context, email string, duration time.Duration) (string, error)
 	GetResetPasswordCodeEmail(ctx context.Context, resetPasswordToken string) (string, error)
+	SendTfaVerificationCode(ctx context.Context, email string, duration time.Duration) (string, error)
+	GetTfaCodeEmail(ctx context.Context, tfaCode string) (string, error)
 }
 
 type AuthStore struct {
 	cache redis.CacheInterface
 }
-
 
 
 func NewAuthStore(db redis.CacheInterface) AuthStoreInterface {
@@ -35,7 +36,7 @@ func (a AuthStore) SendRegistrationVerificationCode(
 }
 
 func (a AuthStore) GetRegistrationCodeEmail(ctx context.Context, registrationToken string) (string, error) {
-	return a.getCodeEmail(ctx, "register:" + registrationToken)
+	return a.getCode(ctx, "register:" + registrationToken)
 }
 
 func (a AuthStore) SendForgotPasswordVerificationCode(
@@ -47,9 +48,18 @@ func (a AuthStore) SendForgotPasswordVerificationCode(
 }
 
 func (a AuthStore) GetResetPasswordCodeEmail(ctx context.Context, resetPasswordToken string) (string, error) {
-	return a.getCodeEmail(ctx, "register:" + resetPasswordToken)
+	return a.getCode(ctx, "register:" + resetPasswordToken)
 }
 
+func (a AuthStore) SendTfaVerificationCode(ctx context.Context, email string, duration time.Duration) (string, error) {
+	token := "tfa:" + tokenGenerator()
+	return a.insertToken(ctx, token, email, duration)
+}
+
+func (a AuthStore) GetTfaCodeEmail(ctx context.Context, tfaCode string) (string, error) {
+	return a.getCode(ctx, "register:" + tfaCode)
+
+}
 
 func (a AuthStore) insertToken(
 	ctx context.Context,
@@ -67,7 +77,7 @@ func (a AuthStore) insertToken(
 
 
 
-func (a AuthStore) getCodeEmail(ctx context.Context, token string) (string, error) {
+func (a AuthStore) getCode(ctx context.Context, token string) (string, error) {
 	email, err := a.cache.Get(ctx, token)
 	if err != nil {
 		return "", err

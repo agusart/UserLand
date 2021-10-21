@@ -13,7 +13,7 @@ var (
 	redisTestDatabase redis.Cmdable
 )
 
-func InitRedisDb() redis.Cmdable {
+func InitRedisCache() redis.Cmdable {
 	addr := getRedisAddress()
 	pass := os.Getenv("REDIS_PASSWORD")
 
@@ -22,6 +22,7 @@ func InitRedisDb() redis.Cmdable {
 		Password: pass,
 		DB:       0,
 	})
+
 
 	return redisDatabase
 }
@@ -33,7 +34,7 @@ func getRedisAddress() string {
 }
 
 
-func InitRedistestDb() redis.Cmdable {
+func InitRedisTestCache() redis.Cmdable {
 	if redisTestDatabase != nil {
 		return redisTestDatabase
 	}

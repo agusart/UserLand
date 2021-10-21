@@ -14,6 +14,7 @@ type User struct {
 	Email string
 	Password string
 	Verified bool
+	TfaEnabled bool
 	CreatedAt *time.Time
 	DeletedAt *time.Time
 }
@@ -21,6 +22,7 @@ type User struct {
 type UserStoreInterface interface {
 	RegisterUser(user User) error
 	GetUserByEmail(email string) (*User, error)
+	GetUserById(userId uint) (*User, error)
 	IsUserVerified(email string) (bool, error)
 	VerifyUser(email string) error
 	UpdateUserPassword(userId uint, newPassword string) error
@@ -44,7 +46,10 @@ func (u UserStore) UpdateUserPassword(userId uint, newPassword string) error {
 	}
 
 	if rowAffected < 1 {
-		return fmt.Errorf("cant verify user")
+		return CustomError{
+			StatusCode: ErrCantVerifyUser,
+			Err: fmt.Errorf("cant verify User"),
+		}
 	}
 
 	return nil
@@ -58,11 +63,14 @@ func (u UserStore) VerifyUser(email string) error {
 
 	rowAffected, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return GeneralDatabaseErr
 	}
 
 	if rowAffected < 1 {
-		return fmt.Errorf("cant verify user")
+		return CustomError{
+			StatusCode: ErrCantVerifyUser,
+			Err: fmt.Errorf("cant verify user"),
+		}
 	}
 
 	return nil
@@ -77,7 +85,7 @@ func NewUserStore(db *sql.DB) UserStoreInterface {
 func (u UserStore) RegisterUser(user User) error {
 	existedUser, err := u.GetUserByEmail(user.Email)
 	if err != nil {
-		return err
+		return GeneralDatabaseErr
 	}
 
 	if existedUser != nil  {
@@ -120,10 +128,46 @@ func (u UserStore) GetUserByEmail(email string) (*User, error) {
 		&user.Password,
 		&user.Email,
 		&user.Verified,
+		&user.TfaEnabled,
 		&user.CreatedAt,
 		&user.DeletedAt,
-		&user.Verified,
 		)
+
+	if err != nil {
+		log.Println(err)
+		if err == sql.ErrNoRows {
+			return nil, CustomError{
+				ErrUserNotfoundCode,
+				fmt.Errorf("user not found"),
+			}
+		}
+
+		return nil, GeneralDatabaseErr
+	}
+
+	return &user, nil
+}
+
+
+func (u UserStore) GetUserById(userId uint) (*User, error) {
+	stmt, err := u.db.Prepare("select * from users where id = $1")
+	if err != nil {
+		return nil, GeneralDatabaseErr
+	}
+
+	var user User
+	row := stmt.QueryRow(userId)
+
+	err = row.Scan(
+		&user.Id,
+		&user.FullName,
+		&user.Password,
+		&user.Email,
+		&user.Verified,
+		&user.TfaEnabled,
+		&user.CreatedAt,
+		&user.DeletedAt,
+	)
 
 	if err != nil {
 		log.Println(err)
@@ -177,7 +221,7 @@ func (u UserStore) isUserExisted(email string) (bool, error) {
 func (u UserStore) execPrepareStatement(customSql string, args ...interface{}) (sql.Result, error){
 	stmt, err := u.db.Prepare(customSql)
 	if err != nil {
-		return nil, err
+		return nil, GeneralDatabaseErr
 	}
 
 	res, err := stmt.Exec(args)
@@ -189,7 +233,7 @@ func (u UserStore) execPrepareStatement(customSql string, args ...interface{}) (
 			}
 		}
 
-		return nil, err
+		return nil, GeneralDatabaseErr
 	}
 
 	return res, nil

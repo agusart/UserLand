@@ -16,7 +16,7 @@ func InitServer(db *sql.DB) *chi.Mux {
 	}
 
 
-	redisClient := redis.InitRedisDb()
+	redisClient := redis.InitRedisCache()
 	cache := redis.NewRedisCacheStore(redisClient)
 	authStore := postgres.NewAuthStore(cache)
 	userStore := postgres.NewUserStore(db)

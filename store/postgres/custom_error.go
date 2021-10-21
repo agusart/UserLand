@@ -5,7 +5,8 @@ import "fmt"
 
 
 const ErrUserAlreadyRegisteredCode = "ER-21"
-const ErrCantInsertRegisterUser = "ER-21"
+const ErrCantInsertRegisterUser = "ER-22"
+const ErrCantVerifyUser = "ER-23"
 
 const ErrUserAlreadyVerifiedCode = "ER-31"
 
@@ -21,7 +22,7 @@ var GeneralDatabaseErr = CustomError {
 
 type CustomErrorInterface interface {
 	Error() string
-	GetErrorCode() string
+	GetDatabaseErrorCode() string
 }
 
 type CustomError struct {
@@ -30,7 +31,7 @@ type CustomError struct {
 }
 
 
-func (e CustomError) GetErrorCode() string {
+func (e CustomError) GetDatabaseErrorCode() string {
 	return e.StatusCode
 }
 

@@ -41,7 +41,7 @@ func (r RegisterVerificationRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
 	if !isValidEmail(r.Recipient) {
-		errorMsg["recepient"] = "recepient is invalid"
+		errorMsg["recipient"] = "recipient is invalid"
 	}
 
 	if r.Type != api.ActionVerifyEmail {
@@ -84,6 +84,41 @@ func (r ResetPasswordRequest) Validate() map[string]string {
 
 	if r.Password != r.PasswordConfirm {
 		errorMsg["password_confirm"] = "password confirm not match"
+	}
+
+	return errorMsg
+}
+
+type LoginRequest struct {
+	Email string `json:"email"`
+	Password string `json:"password"`
+}
+
+
+func(r LoginRequest) Validate() map[string]string{
+	errorMsg := make(map[string]string)
+
+	if !isValidEmail(r.Email) {
+		errorMsg["email"] = "email is invalid"
+	}
+
+	if len(r.Password) < 1 {
+		errorMsg["password"] = "password must not be empty"
+	}
+
+	return errorMsg
+
+}
+
+type VerifyTfaRequest struct {
+	Code string `json:"code"`
+}
+
+func(r VerifyTfaRequest) Validate() map[string]string {
+	errorMsg := make(map[string]string)
+
+	if r.Code == "" {
+		errorMsg["code"] = "code required"
 	}
 
 	return errorMsg

@@ -7,14 +7,16 @@ import (
 
 
 type JWTClaims struct {
-	Username string
-	SessionId int
+	UserId uint
+	SessionId uint
+	TfaEnabled bool
 	jwt.StandardClaims
 }
 
 type JWTToken struct {
-	Token     string
-	ExpiredAt time.Time
+	Token     string `json:"value"`
+	ExpiredAt time.Time `json:"expired_at"`
+	TokenType string
 }
 
 type JWTConfig struct {
@@ -38,8 +40,10 @@ func NewJWTConfig(
 }
 
 type JwtHandlerInterface interface {
-	GenerateAccesToken(username string, sessionId int) (*JWTToken, error)
-	GenerateRefreshToken(username string, sessionId int) (*JWTToken, error)
+	GenerateAccessToken(userID, sessionId uint) (*JWTToken, error)
+	GenerateRefreshToken(userID, sessionId uint) (*JWTToken, error)
+	GenerateAccessTokenTfa(userID, sessionId uint) (*JWTToken, error)
+	GenerateRefreshTokenTfa(userID, sessionId uint) (*JWTToken, error)
 	ClaimToken(token string) (*JWTClaims, error)
 }
 
@@ -53,21 +57,44 @@ func NewJWTHandler(config JWTConfig) JWTHandler {
 	}
 }
 
-func (h JWTHandler) GenerateAccesToken(username string, sessionId int) (*JWTToken, error) {
-	return h.generateToken(username, sessionId, h.config.accesTokenExpiredTime)
-}
-
-func (h JWTHandler) GenerateRefreshToken(username string, sessionId int) (*JWTToken, error) {
-	return h.generateToken(username, sessionId, h.config.refreshTokenExpiredTime)
-}
-
-func (h JWTHandler) generateToken(username string, sessionId int, duration time.Duration) (*JWTToken, error) {
-
+func (h JWTHandler) GenerateAccessToken(userId, sessionId uint) (*JWTToken, error) {
 	claims := JWTClaims{
-		Username: username,
+		UserId: userId,
+		SessionId: sessionId,
+	}
+	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+}
+
+func (h JWTHandler) GenerateAccessTokenTfa(userId, sessionId uint) (*JWTToken, error) {
+	claims := JWTClaims{
+		UserId: userId,
+		SessionId: sessionId,
+		TfaEnabled: true,
+	}
+
+	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+}
+
+func (h JWTHandler) GenerateRefreshToken(userId, sessionId uint) (*JWTToken, error) {
+	claims := JWTClaims{
+		UserId: userId,
 		SessionId: sessionId,
 	}
 
+	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+}
+
+func (h JWTHandler) GenerateRefreshTokenTfa(userId, sessionId uint) (*JWTToken, error) {
+	claims := JWTClaims{
+		UserId: userId,
+		SessionId: sessionId,
+		TfaEnabled: true,
+	}
+
+	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+}
+
+func (h JWTHandler) generateToken(claims JWTClaims, duration time.Duration) (*JWTToken, error) {
 	expiredTime := time.Now().Add(duration)
 	claims.ExpiresAt = expiredTime.Unix()
 
