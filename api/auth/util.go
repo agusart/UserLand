@@ -61,27 +61,3 @@ func CheckPasswordHash(password, hash string) bool {
 }
 
 
-func GenerateErrorResponse(err error) ErrorResponse {
-	var (
-		errCode string
-		errMsg string
-	)
-
-	switch err.(type) {
-	case postgres.CustomErrorInterface:
-		customError := err.(postgres.CustomErrorInterface)
-		errMsg = customError.Error()
-		errCode = customError.GetDatabaseErrorCode()
-		break
-	default:
-		errCode = api.ErrInternalServerErrorCode
-		errMsg = "internal server error"
-		break
-	}
-
-	return ErrorResponse {
-		Code: errCode,
-		Message: errMsg,
-	}
-}
-

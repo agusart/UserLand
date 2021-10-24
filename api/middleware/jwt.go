@@ -3,17 +3,22 @@ package middleware
 import (
 	"github.com/dgrijalva/jwt-go"
 	"time"
+	"userland/api"
 )
 
 
 type JWTClaims struct {
-	UserId uint
-	SessionId uint
-	TfaEnabled bool
+	UserId      uint
+	UserHasTfa  bool
+	SessionId   uint
+	TfaVerified bool
 	jwt.StandardClaims
 }
 
+
+
 type JWTToken struct {
+	Id string `json:"-"`
 	Token     string `json:"value"`
 	ExpiredAt time.Time `json:"expired_at"`
 	TokenType string
@@ -22,28 +27,26 @@ type JWTToken struct {
 type JWTConfig struct {
 	jwtKey         []byte
 	refreshTokenExpiredTime time.Duration
-	accesTokenExpiredTime time.Duration
+	accessTokenExpiredTime time.Duration
 	alg jwt.SigningMethod
 }
 
 func NewJWTConfig(
 	jwtKey string,
 	refreshTokenExpiredTime,
-	accesTokenExpiredTime time.Duration,
+	accessTokenExpiredTime time.Duration,
 	alg jwt.SigningMethod) JWTConfig {
 		return JWTConfig{
 			jwtKey:         []byte(jwtKey),
 			alg: alg,
 			refreshTokenExpiredTime: refreshTokenExpiredTime,
-			accesTokenExpiredTime: accesTokenExpiredTime,
+			accessTokenExpiredTime: accessTokenExpiredTime,
 		}
 }
 
 type JwtHandlerInterface interface {
-	GenerateAccessToken(userID, sessionId uint) (*JWTToken, error)
-	GenerateRefreshToken(userID, sessionId uint) (*JWTToken, error)
-	GenerateAccessTokenTfa(userID, sessionId uint) (*JWTToken, error)
-	GenerateRefreshTokenTfa(userID, sessionId uint) (*JWTToken, error)
+	GenerateAccessToken(claim JWTClaims) (*JWTToken, error)
+	GenerateRefreshToken(claim JWTClaims) (*JWTToken, error)
 	ClaimToken(token string) (*JWTClaims, error)
 }
 
@@ -57,47 +60,20 @@ func NewJWTHandler(config JWTConfig) JWTHandler {
 	}
 }
 
-func (h JWTHandler) GenerateAccessToken(userId, sessionId uint) (*JWTToken, error) {
-	claims := JWTClaims{
-		UserId: userId,
-		SessionId: sessionId,
-	}
-	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+func (h JWTHandler) GenerateAccessToken(claim JWTClaims) (*JWTToken, error) {
+	expiredTime := time.Now().Add(api.AccessTokenExpTime)
+	claim.ExpiresAt = expiredTime.Unix()
+	return h.generateToken(claim)
 }
 
-func (h JWTHandler) GenerateAccessTokenTfa(userId, sessionId uint) (*JWTToken, error) {
-	claims := JWTClaims{
-		UserId: userId,
-		SessionId: sessionId,
-		TfaEnabled: true,
-	}
-
-	return h.generateToken(claims, h.config.accesTokenExpiredTime)
+func (h JWTHandler) GenerateRefreshToken(claim JWTClaims) (*JWTToken, error) {
+	expiredTime := time.Now().Add(api.RefreshTokenExpTime)
+	claim.ExpiresAt = expiredTime.Unix()
+	return h.generateToken(claim)
 }
 
-func (h JWTHandler) GenerateRefreshToken(userId, sessionId uint) (*JWTToken, error) {
-	claims := JWTClaims{
-		UserId: userId,
-		SessionId: sessionId,
-	}
 
-	return h.generateToken(claims, h.config.accesTokenExpiredTime)
-}
-
-func (h JWTHandler) GenerateRefreshTokenTfa(userId, sessionId uint) (*JWTToken, error) {
-	claims := JWTClaims{
-		UserId: userId,
-		SessionId: sessionId,
-		TfaEnabled: true,
-	}
-
-	return h.generateToken(claims, h.config.accesTokenExpiredTime)
-}
-
-func (h JWTHandler) generateToken(claims JWTClaims, duration time.Duration) (*JWTToken, error) {
-	expiredTime := time.Now().Add(duration)
-	claims.ExpiresAt = expiredTime.Unix()
-
+func (h JWTHandler) generateToken(claims JWTClaims) (*JWTToken, error) {
 	token := jwt.NewWithClaims(
 		h.config.alg,
 		claims,
@@ -108,7 +84,7 @@ func (h JWTHandler) generateToken(claims JWTClaims, duration time.Duration) (*JW
 		return nil, err
 	}
 
-	return &JWTToken{Token: tokenString, ExpiredAt: expiredTime}, err
+	return &JWTToken{Token: tokenString, ExpiredAt: time.Unix(claims.ExpiresAt, 0), Id: claims.Id}, err
 }
 
 func (h JWTHandler) ClaimToken(token string) (*JWTClaims, error) {

@@ -1,7 +1,5 @@
 package postgres
 
-import "fmt"
-
 
 
 const ErrUserAlreadyRegisteredCode = "ER-21"
@@ -11,18 +9,14 @@ const ErrCantVerifyUser = "ER-23"
 const ErrUserAlreadyVerifiedCode = "ER-31"
 
 const ErrUserNotfoundCode = "ER-41"
+const ErrGeneralDbErr = "ER-DB"
 
-
-
-var GeneralDatabaseErr = CustomError {
-	"ER-DB",
-	fmt.Errorf("database error"),
-}
 
 
 type CustomErrorInterface interface {
 	Error() string
 	GetDatabaseErrorCode() string
+	GetErr() error
 }
 
 type CustomError struct {
@@ -30,6 +24,9 @@ type CustomError struct {
 	Err error
 }
 
+func (e CustomError) GetErr() error {
+	return e.Err
+}
 
 func (e CustomError) GetDatabaseErrorCode() string {
 	return e.StatusCode

@@ -1,7 +1,9 @@
 create table if not exists tfa_backup_code (
     id serial primary key,
-    code int not null,
-    user_id int not null
+    code text not null,
+    user_id int not null,
+    created_at timestamp,
+    deleted_at timestamp
 );
 
 alter table tfa_backup_code

@@ -8,6 +8,7 @@ const HashPasswordCost = 14
 const ErrInternalServerErrorCode = "ER-1"
 
 const ErrWringPasswordCode = "ER-21"
+const ErrUnverifiedCode = "ER-22"
 
 const ErrBadRequestErrorCode = "ER-4"
 const ErrBadRequestWrongVerifyToken = "ER-41"
@@ -21,5 +22,7 @@ const TfaExpiredTime = 5 * time.Minute
 
 const ForgotPasswordExpiredTime = 3 * time.Hour
 
+const ContextClaimsJwt = "context.jwt"
 
-const ContextUserIdKey = "context.userId"
+const RefreshTokenExpTime = 30 * 24 * time.Hour
+const AccessTokenExpTime = 50 * time.Minute

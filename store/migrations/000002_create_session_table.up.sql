@@ -4,10 +4,8 @@ create table if not exists session (
     ip text,
     name text,
     jwt_id text,
-    is_current bool default false,
     created_at timestamp,
     deleted_at timestamp
-
 );
 
 create table if not exists client (

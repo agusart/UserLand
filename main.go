@@ -2,7 +2,9 @@ package main
 
 import (
 	"github.com/joho/godotenv"
-	"log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 	"net/http"
 	"os"
 	"strconv"
@@ -10,15 +12,16 @@ import (
 )
 
 
-func main(){
+func main(){	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+		log.Err(err)
 	}
+
 
 	port, err := strconv.Atoi(os.Getenv("POSTGRES_PORT"))
 	if err != nil {
-		log.Fatalf("cant convert db port env to integer: %v", err)
+		log.Err(err)
 	}
 	postgresCfg := postgres.PGConfig{
 		Host: os.Getenv("POSTGRES_ADDR"),
@@ -30,7 +33,7 @@ func main(){
 
 	db, err :=  postgres.NewPG(postgresCfg)
 	if err != nil {
-		log.Fatalf("cant open db: %v", err)
+		log.Err( err)
 	}
 
 

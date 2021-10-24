@@ -74,7 +74,7 @@ type ResetPasswordRequest struct {
 func (r ResetPasswordRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
-	if r.Token != "" {
+	if r.Token == "" {
 		errorMsg["token"] = "token should not be empty"
 	}
 
