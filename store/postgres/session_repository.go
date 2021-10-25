@@ -8,14 +8,20 @@ import (
 	"time"
 )
 
-type Session struct {
+type ClientSession struct {
 	Id uint
-	UserId uint
-	IP string
 	Name string
-	JwtId string
+	CreatedAt time.Time
+}
+type Session struct {
+	Id uint `json:"-"`
+	UserId uint `json:"-"`
+	Client ClientSession
+	IP string
+	JwtId string `json:"-"`
 	CreatedAt time.Time
 	DeletedAt time.Time
+	IsCurrent bool
 }
 
 type SessionStoreInterface interface {
@@ -24,6 +30,7 @@ type SessionStoreInterface interface {
 	DeleteSession(session Session) error
 	GetSessionById(id uint) (*Session, error)
 	GetSessionByUserId(userId uint) ([]Session, error)
+	CreateClient(name string) (*ClientSession, error)
 }
 
 
@@ -31,6 +38,36 @@ type SessionStore struct {
 	db *sql.DB
 }
 
+func (s SessionStore) CreateClient(name string) (*ClientSession, error) {
+	insertClientQuery := "insert into client(name, created_at) values($1, $2) on conflict(name) do update set created_at = now() returning id"
+	var insertedId uint
+	createdAt := time.Now()
+	row, err := QueryRowPrepareStatement(
+		s.db,
+		insertClientQuery,
+		name,
+		createdAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = row.Scan(&insertedId)
+	if err != nil {
+		return nil, CustomError {
+			ErrCantInsertRegisterUser,
+			fmt.Errorf("failed to create client"),
+		}
+	}
+
+	return &ClientSession{
+		CreatedAt: createdAt,
+		Id: insertedId,
+		Name: name,
+
+	}, nil
+}
 
 func NewSessionStore(db *sql.DB) SessionStoreInterface {
 	return SessionStore{db: db}
@@ -38,7 +75,7 @@ func NewSessionStore(db *sql.DB) SessionStoreInterface {
 
 
 func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
-	insertSessionQuery := "insert into session(ip, jwt_id, user_id, name, created_at)" +
+	insertSessionQuery := "insert into session(ip, jwt_id, user_id, client_id, created_at)" +
 		"VALUES ($1, $2, $3, $4, $5) RETURNING id"
 
 	session.CreatedAt = time.Now()
@@ -49,7 +86,7 @@ func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 		session.IP,
 		session.JwtId,
 		session.UserId,
-		session.Name,
+		session.Client.Id,
 		session.CreatedAt,
 		)
 
@@ -70,14 +107,14 @@ func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 }
 
 func (s SessionStore) UpdateSession(session Session) error {
-	updateSessionSql := "UPDATE session SET ip=$1, jwt_id=$2, name=$3, user_id=$4, created_at=$5, deleted_at=$6 where id = $7"
+	updateSessionSql := "UPDATE session SET ip=$1, jwt_id=$2, client_id=$3, user_id=$4, created_at=$5, deleted_at=$6 where id = $7"
 
 	res, err := ExecPrepareStatement(
 		s.db,
 		updateSessionSql,
 		session.IP,
 		session.JwtId,
-		session.Name,
+		session.Client.Id,
 		session.UserId,
 		session.CreatedAt,
 		session.DeletedAt,
@@ -111,7 +148,7 @@ func (s SessionStore) DeleteSession(session Session) error {
 }
 
 func (s SessionStore) GetSessionById(id uint) (*Session, error) {
-	getSessionSql := "select * from session where id = $1"
+	getSessionSql := "select s.id, s.user_id, s.ip, c.id, c.name, s.jwt_id, s.created_at, s.deleted_at from session s inner join client c on s.client_id = c.id where s.id = $1"
 	row, err := QueryRowPrepareStatement(s.db, getSessionSql, id)
 	if err != nil {
 		return nil, err
@@ -121,7 +158,7 @@ func (s SessionStore) GetSessionById(id uint) (*Session, error) {
 }
 
 func (s SessionStore) GetSessionByUserId(userId uint) ([]Session, error) {
-	getSessionSql := "select * from session where user_id = $1"
+	getSessionSql := "select s.id, s.user_id, s.ip, c.id, c.name, s.jwt_id, s.created_at, s.deleted_at from session s inner join client c on s.client_id = c.id where s.user_id = $1"
 	row, err := QueryPrepareStatement(s.db, getSessionSql, userId)
 	if err != nil {
 		return nil, err
@@ -139,7 +176,8 @@ func (s SessionStore) getSessionFromRows(rows *sql.Rows) ([]Session, error){
 			&session.Id,
 			&session.UserId,
 			&session.IP,
-			&session.Name,
+			&session.Client.Id,
+			&session.Client.Name,
 			&session.JwtId,
 			&session.CreatedAt,
 			&session.DeletedAt,
@@ -167,7 +205,8 @@ func (s SessionStore) getSessionFromRow(row *sql.Row) (*Session, error){
 		&session.Id,
 		&session.UserId,
 		&session.IP,
-		&session.Name,
+		&session.Client.Id,
+		&session.Client.Name,
 		&session.JwtId,
 		&session.CreatedAt,
 		&session.DeletedAt,

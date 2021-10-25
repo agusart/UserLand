@@ -40,7 +40,7 @@ func Login(
 		if !CheckPasswordHash(loginRequest.Password, loginUser.Password){
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
-				Code: api.ErrWringPasswordCode,
+				Code: api.ErrWrongPasswordCode,
 				Message: "incorrect password",
 			})
 			return
@@ -59,6 +59,20 @@ func Login(
 			UserId: loginUser.Id,
 		}
 
+		clientName := r.Header.Get(api.ContextApiClientId)
+		if clientName == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		client, err := sessionStore.CreateClient(clientName)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		session.Client = *client
 		createdSeason, err := sessionStore.CreateNewSession(session)
 		if createdSeason == nil {
 			w.WriteHeader(http.StatusInternalServerError)

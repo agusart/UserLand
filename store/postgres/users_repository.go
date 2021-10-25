@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"time"
@@ -17,6 +18,10 @@ type User struct {
 	TfaEnabled bool
 	CreatedAt *time.Time
 	DeletedAt *time.Time
+	Location string
+	Bio string
+	Web string
+	Picture string
 }
 
 type UserStoreInterface interface {
@@ -26,6 +31,10 @@ type UserStoreInterface interface {
 	IsUserVerified(email string) (bool, error)
 	VerifyUser(email string) error
 	UpdateUserPassword(userId uint, newPassword string) error
+	UpdateUserBasicInfo(user User) error
+	SaveUserTfaSecret(secret string, userId uint) error
+	RemoveTfaStatus(userId uint) error
+	DeleteUser(userId uint) error
 }
 
 type UserStore struct {
@@ -33,11 +42,139 @@ type UserStore struct {
 	cache redis.CacheInterface
 }
 
+func (u UserStore) DeleteUser(userId uint) error {
+	sqlDeleteUser := "update table users set deleted_at=now() where id=$1"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlDeleteUser,
+		userId,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return CustomError {
+			ErrGeneralDbErr,
+			errors.New("database error"),
+		}
+	}
+
+	if rowAffected < 1 {
+		return CustomError{
+			StatusCode: ErrCantUpdateUser,
+			Err: fmt.Errorf("cant update user"),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) RemoveTfaStatus(userId uint) error {
+	sqlRemoveTfaStatus := "update table users set tfa_secret='', tfa_enabled=$1 where id=$2"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlRemoveTfaStatus,
+		false,
+		userId,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return CustomError {
+			ErrGeneralDbErr,
+			errors.New("database error"),
+		}
+	}
+
+	if rowAffected < 1 {
+		return CustomError{
+			StatusCode: ErrCantUpdateUser,
+			Err: fmt.Errorf("cant update user"),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) SaveUserTfaSecret(secret string, userId uint) error {
+	sqlUpdateUserSecret := "update table users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlUpdateUserSecret,
+		secret,
+		true,
+		userId,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return CustomError {
+			ErrGeneralDbErr,
+			errors.New("database error"),
+		}
+	}
+
+	if rowAffected < 1 {
+		return CustomError{
+			StatusCode: ErrCantUpdateUser,
+			Err: fmt.Errorf("cant update user"),
+		}
+	}
+
+	return nil
+}
+
 func NewUserStore(db *sql.DB) UserStoreInterface {
 	return UserStore{
 		db: db,
 	}
 }
+
+
+func (u UserStore) UpdateUserBasicInfo(user User) error {
+	updateBasicInfoSql := "update table users set full_name = $1, location=$2, web=$3, bio=$4, email=$5 where id = $6"
+	res, err := ExecPrepareStatement(
+		u.db,
+		updateBasicInfoSql,
+		user.FullName,
+		user.Location,
+		user.Web,
+		user.Bio,
+		user.Email,
+		user.Id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return CustomError {
+			ErrGeneralDbErr,
+			errors.New("database error"),
+		}
+	}
+
+	if rowAffected < 1 {
+		return CustomError{
+			StatusCode: ErrCantUpdateUser,
+			Err: fmt.Errorf("cant update user"),
+		}
+	}
+
+	return nil
+}
+
+
 
 func (u UserStore) UpdateUserPassword(userId uint, newPassword string) error {
 	updateSql := "UPDATE  users set password = $1 where id = $2"
@@ -196,6 +333,10 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 		&user.TfaEnabled,
 		&user.CreatedAt,
 		&user.DeletedAt,
+		&user.Location,
+		&user.Bio,
+		&user.Web,
+		&user.Picture,
 	)
 
 	if err != nil {

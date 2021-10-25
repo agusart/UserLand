@@ -51,6 +51,11 @@ func InitServer(db *sql.DB) *chi.Mux {
 	router.Route("/me", func(r chi.Router) {
 		r.Use(authMiddleware.UserAuthMiddleware)
 		r.Get("/session", session.ListSession(sessionStore))
+		r.Delete("/session", session.EndSession(sessionStore, cache))
+		r.Delete("/session/other", session.EndAllOtherSessions(sessionStore, cache))
+		r.Get("/session/refresh-token", session.RefreshToken(jwtHandler))
+		r.Get("/session/access-token", session.NewAccessToken(jwtHandler))
+
 	})
 
 	return router

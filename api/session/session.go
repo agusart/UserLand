@@ -14,6 +14,10 @@ func ListSession(sessionStore postgres.SessionStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		sessions, err := sessionStore.GetSessionByUserId(claim.UserId)
+		for _, s := range sessions{
+			s.IsCurrent = s.Id == claim.SessionId
+		}
+
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
@@ -28,8 +32,8 @@ func ListSession(sessionStore postgres.SessionStoreInterface) http.HandlerFunc {
 }
 
 func EndSession(
-		cache redis.CacheInterface,
 		sessionStore postgres.SessionStoreInterface,
+		cache redis.CacheInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
@@ -97,10 +101,6 @@ func RefreshToken(
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
-		if time.Unix(claim.ExpiresAt, 0).Sub(time.Now()) < api.RefreshTokenExpTime {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
 		refreshToken, err := jwt.GenerateRefreshToken(claim)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -119,7 +119,7 @@ func RefreshToken(
 func NewAccessToken(jwt middleware.JwtHandlerInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
-		if time.Unix(claim.ExpiresAt, 0).Sub(time.Now()) < api.RefreshTokenExpTime {
+		if time.Unix(claim.ExpiresAt, 0).Sub(time.Now()) < api.AccessTokenExpTime {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -132,7 +132,7 @@ func NewAccessToken(jwt middleware.JwtHandlerInterface) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"refresh_token" : refreshToken,
+			"access_token" : refreshToken,
 		})
 	}
 }

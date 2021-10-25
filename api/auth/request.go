@@ -16,7 +16,7 @@ func (r RegisterRequest) Validate() map[string]string {
 		errorMsg["full_name"] = "Fullname must between 5 to 40 character"
 	}
 
-	if !isValidEmail(r.Email) {
+	if !IsValidEmail(r.Email) {
 		errorMsg["email"] = "Email is invalid"
 	}
 
@@ -25,7 +25,7 @@ func (r RegisterRequest) Validate() map[string]string {
 		return errorMsg
 	}
 
-	if !isValidPassword(r.Password) {
+	if !IsValidPassword(r.Password) {
 		errorMsg["password"] = "password is not strong"
 	}
 
@@ -40,7 +40,7 @@ type RegisterVerificationRequest struct {
 func (r RegisterVerificationRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
-	if !isValidEmail(r.Recipient) {
+	if !IsValidEmail(r.Recipient) {
 		errorMsg["recipient"] = "recipient is invalid"
 	}
 
@@ -58,7 +58,7 @@ type ForgotPasswordRequest struct {
 func (f ForgotPasswordRequest) Validate() map[string]string {
 	errorMsg := make(map[string]string)
 
-	if !isValidEmail(f.Email) {
+	if !IsValidEmail(f.Email) {
 		errorMsg["email"] = "invalid email format"
 	}
 
@@ -78,7 +78,7 @@ func (r ResetPasswordRequest) Validate() map[string]string {
 		errorMsg["token"] = "token should not be empty"
 	}
 
-	if !isValidPassword(r.Password) {
+	if !IsValidPassword(r.Password) {
 		errorMsg["password"] = "password is weak"
 	}
 
@@ -98,7 +98,7 @@ type LoginRequest struct {
 func(r LoginRequest) Validate() map[string]string{
 	errorMsg := make(map[string]string)
 
-	if !isValidEmail(r.Email) {
+	if !IsValidEmail(r.Email) {
 		errorMsg["email"] = "email is invalid"
 	}
 

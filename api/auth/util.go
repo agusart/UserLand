@@ -8,12 +8,12 @@ import (
 	"userland/store/postgres"
 )
 
-func isValidEmail(email string) bool {
+func IsValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
 }
 
-func isValidPassword(password string) bool {
+func IsValidPassword(password string) bool {
 	var (
 		hasMinLen  = false
 		hasUpper   = false

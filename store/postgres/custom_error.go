@@ -2,12 +2,11 @@ package postgres
 
 
 
-const ErrUserAlreadyRegisteredCode = "ER-21"
+const ErrUserAlreadyRegisteredCode = "ER-24"
 const ErrCantInsertRegisterUser = "ER-22"
 const ErrCantVerifyUser = "ER-23"
-
+const ErrCantUpdateUser = "ER-25"
 const ErrUserAlreadyVerifiedCode = "ER-31"
-
 const ErrUserNotfoundCode = "ER-41"
 const ErrGeneralDbErr = "ER-DB"
 
