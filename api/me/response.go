@@ -6,23 +6,23 @@ import (
 )
 
 type UserResponse struct {
-	Id uint `json:"id"`
-	FullName string `json:"fullname"`
-	Location string `json:"location"`
-	Bio string `json:"bio"`
-	Web string `json:"web"`
-	Picture string `json:"picture"`
+	Id        uint      `json:"id"`
+	FullName  string    `json:"fullname"`
+	Location  string    `json:"location"`
+	Bio       string    `json:"bio"`
+	Web       string    `json:"web"`
+	Picture   string    `json:"picture"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 func NewUserResponse(u postgres.User) UserResponse {
 	return UserResponse{
-		Id: u.Id,
-		FullName: u.FullName,
-		Location: u.Location,
-		Bio: u.Bio,
-		Web: u.Web,
-		Picture: u.Picture,
+		Id:        u.Id,
+		FullName:  u.FullName,
+		Location:  u.Location.String,
+		Bio:       u.Bio.String,
+		Web:       u.Web.String,
+		Picture:   u.Picture.String,
 		CreatedAt: *u.CreatedAt,
 	}
 }

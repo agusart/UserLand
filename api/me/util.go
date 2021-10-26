@@ -36,7 +36,6 @@ func randStr(strSize int, randType string) string {
 	return string(bytesData)
 }
 
-
 func generateTfaSecret() string {
 	randomStr := randStr(6, "alphanum")
 	secret := base32.StdEncoding.EncodeToString([]byte(randomStr))
@@ -45,10 +44,9 @@ func generateTfaSecret() string {
 }
 
 func generateAuthLink(secret, issuer string) string {
-	authLink := "otpauth://totp/Userland?secret=" + secret + "&issuer="+issuer
+	authLink := "otpauth://totp/Userland?secret=" + secret + "&issuer=" + issuer
 	return authLink
 }
-
 
 func getBase64String(m image.Image) string {
 	var buf bytes.Buffer
@@ -70,8 +68,7 @@ func GenerateQRString(authLink string) (string, error) {
 	return getBase64String(code.Image(256)), nil
 }
 
-
-func verifyTfaCode(request ActivateTfaRequest) (bool, error) {
+func VerifyTfaCode(request ActivateTfaRequest) (bool, error) {
 	otpConfig := &dgoogauth.OTPConfig{
 		Secret:      strings.TrimSpace(request.Secret),
 		WindowSize:  3,

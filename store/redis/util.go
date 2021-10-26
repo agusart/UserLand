@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 )
@@ -37,6 +38,12 @@ func getMapFromStruct(s interface{}) map[string]interface{} {
 
 func GenerateUserSessionKey(userId, sessionId uint) string{
 	return fmt.Sprintf("%d:session:%d", userId, sessionId)
+}
+
+func tokenGenerator() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)
 }
 
 

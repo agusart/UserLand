@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"net/http"
 	"userland/api"
@@ -86,6 +87,7 @@ func Login(
 			TfaVerified: false,
 		}
 
+		claim.Id = uuid.NewString()
 		var accessToken *middleware.JWTToken
 		accessToken, err = jwt.GenerateAccessToken(claim)
 		if err != nil {
@@ -114,6 +116,8 @@ func Login(
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
+
+		log.Print(sessionStore)
 
 		if !loginUser.TfaEnabled {
 			w.WriteHeader(http.StatusOK)
@@ -427,7 +431,6 @@ func VerifyTfa(
 
 func BypassTfa(
 	jwt middleware.JwtHandlerInterface,
-	sessionStore postgres.SessionStoreInterface,
 	tfaStore postgres.TfaStoreInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

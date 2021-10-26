@@ -19,6 +19,7 @@ func tokenGenerator() string {
 func prepareStatement(db *sql.DB, customSql string) (*sql.Stmt, error) {
 	stmt, err := db.Prepare(customSql)
 	if err != nil {
+		log.Print(err)
 		return nil, CustomError {
 			ErrGeneralDbErr,
 			errors.New("database error"),
@@ -30,6 +31,10 @@ func prepareStatement(db *sql.DB, customSql string) (*sql.Stmt, error) {
 
 func ExecPrepareStatement(db *sql.DB, customSql string, args ...interface{}) (sql.Result, error){
 	stmt, err := prepareStatement(db, customSql)
+	if err != nil {
+		return nil, generateErr(err)
+	}
+
 	res, err := stmt.Exec(args...)
 	if err != nil {
 		return nil, generateErr(err)
@@ -68,7 +73,6 @@ func generateTfaCode() string {
 }
 
 func generateErr(err error) error {
-	log.Print(err)
 	if err == sql.ErrNoRows {
 		return CustomError{
 			ErrUserNotfoundCode,
@@ -76,8 +80,5 @@ func generateErr(err error) error {
 		}
 	}
 
-	return CustomError {
-		ErrGeneralDbErr,
-		errors.New("database error"),
-	}
+	return err
 }

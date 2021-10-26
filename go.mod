@@ -10,6 +10,7 @@ require (
 	github.com/go-chi/chi/v5 v5.0.4
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/gomodule/redigo v1.8.5 // indirect
+	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/joho/godotenv v1.4.0
 	github.com/pkg/errors v0.9.1

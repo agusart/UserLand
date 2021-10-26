@@ -2,14 +2,16 @@ package redis
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-redis/redis/v8"
+	"log"
 	"time"
 )
 
 type SessionCache struct {
-	Id uint `redis:"id"`
-	UserId uint `redis:"user_id"`
-	JwtId string `redis:"jwt_id"`
+	Id uint `redis:"Id"`
+	UserId uint `redis:"UserId"`
+	JwtId string `redis:"JwtId"`
 }
 
 type CacheInterface interface {
@@ -19,11 +21,25 @@ type CacheInterface interface {
 	InsertSessionCache(ctx context.Context, cache SessionCache) error
 	GetSessionCache(ctx context.Context, userId, sessionId uint) (*SessionCache, error)
 	DeleteSessionCache(ctx context.Context, userId, sessionId uint) error
+	RequestChangeEmail(ctx context.Context, userId uint, email string, duration time.Duration) error
+	GetVerifyChangeEmail(ctx context.Context, userId uint, token string) (string, error)
 }
 
 
 type CacheStore struct {
 	client redis.Cmdable
+}
+
+func (c CacheStore) RequestChangeEmail(ctx context.Context, userId uint, email string, duration time.Duration) error {
+	token := tokenGenerator()
+	log.Print(token)
+	key :=  fmt.Sprintf("change-email:%d:%s", userId, token)
+	return c.SetWithTimout(ctx, key, email, duration)}
+
+func (c CacheStore) GetVerifyChangeEmail(ctx context.Context, userId uint, token string) (string, error) {
+	key :=  fmt.Sprintf("change-email:%d:%s", userId, token)
+	defer c.Unlink(ctx, key)
+	return c.client.Get(ctx, key).Result()
 }
 
 func (c CacheStore) DeleteSessionCache(ctx context.Context, userId, sessionId uint) error {
@@ -33,6 +49,7 @@ func (c CacheStore) DeleteSessionCache(ctx context.Context, userId, sessionId ui
 
 func (c CacheStore) InsertSessionCache(ctx context.Context, cache SessionCache) error {
 	key := GenerateUserSessionKey(cache.UserId, cache.Id)
+	log.Print(key)
 	args := StructToArgs(cache)
 	err := c.client.HMSet(ctx, key, args...).Err()
 
@@ -42,11 +59,12 @@ func (c CacheStore) InsertSessionCache(ctx context.Context, cache SessionCache) 
 func (c CacheStore) GetSessionCache(ctx context.Context, userId, sessionId uint) (*SessionCache, error) {
 	key := GenerateUserSessionKey(userId, sessionId)
 	sessionCache := SessionCache{}
-
 	err := c.client.HGetAll(ctx, key).Scan(&sessionCache)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Print(sessionCache)
 
 	return &sessionCache, nil
 }

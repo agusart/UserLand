@@ -30,7 +30,7 @@ func GenerateErrorResponse(err error) ErrorResponse {
 		errMsg = "internal server error"
 		break
 	}
-
+	log.Err(err)
 	return ErrorResponse {
 		Code: errCode,
 		Message: errMsg,

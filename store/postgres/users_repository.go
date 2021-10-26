@@ -18,10 +18,11 @@ type User struct {
 	TfaEnabled bool
 	CreatedAt *time.Time
 	DeletedAt *time.Time
-	Location string
-	Bio string
-	Web string
-	Picture string
+	Location sql.NullString
+	Bio sql.NullString
+	Web sql.NullString
+	Picture sql.NullString
+	TfaSecret sql.NullString `json:"-"`
 }
 
 type UserStoreInterface interface {
@@ -35,6 +36,7 @@ type UserStoreInterface interface {
 	SaveUserTfaSecret(secret string, userId uint) error
 	RemoveTfaStatus(userId uint) error
 	DeleteUser(userId uint) error
+	ChangeUserEmail(userId uint, email string) error
 }
 
 type UserStore struct {
@@ -42,8 +44,40 @@ type UserStore struct {
 	cache redis.CacheInterface
 }
 
+
+func (u UserStore) ChangeUserEmail(userId uint, email string) error {
+	sqlUpdateEmail := "update users set email=$1 where id=$2"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlUpdateEmail,
+		email,
+		userId,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil {
+		return CustomError {
+			ErrGeneralDbErr,
+			errors.New("database error"),
+		}
+	}
+
+	if rowAffected < 1 {
+		return CustomError{
+			StatusCode: ErrCantUpdateUser,
+			Err: fmt.Errorf("cant update user"),
+		}
+	}
+
+	return nil
+}
+
 func (u UserStore) DeleteUser(userId uint) error {
-	sqlDeleteUser := "update table users set deleted_at=now() where id=$1"
+	sqlDeleteUser := "update users set deleted_at=now() where id=$1"
 	res, err := ExecPrepareStatement(
 		u.db,
 		sqlDeleteUser,
@@ -73,7 +107,7 @@ func (u UserStore) DeleteUser(userId uint) error {
 }
 
 func (u UserStore) RemoveTfaStatus(userId uint) error {
-	sqlRemoveTfaStatus := "update table users set tfa_secret='', tfa_enabled=$1 where id=$2"
+	sqlRemoveTfaStatus := "update users set tfa_secret='', tfa_enabled=$1 where id=$2"
 	res, err := ExecPrepareStatement(
 		u.db,
 		sqlRemoveTfaStatus,
@@ -103,7 +137,7 @@ func (u UserStore) RemoveTfaStatus(userId uint) error {
 }
 
 func (u UserStore) SaveUserTfaSecret(secret string, userId uint) error {
-	sqlUpdateUserSecret := "update table users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
+	sqlUpdateUserSecret := "update users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
 	res, err := ExecPrepareStatement(
 		u.db,
 		sqlUpdateUserSecret,
@@ -141,14 +175,14 @@ func NewUserStore(db *sql.DB) UserStoreInterface {
 
 
 func (u UserStore) UpdateUserBasicInfo(user User) error {
-	updateBasicInfoSql := "update table users set full_name = $1, location=$2, web=$3, bio=$4, email=$5 where id = $6"
+	updateBasicInfoSql := "update users set full_name=$1, location=$2, web=$3, bio=$4, email=$5 where id=$6"
 	res, err := ExecPrepareStatement(
 		u.db,
 		updateBasicInfoSql,
 		user.FullName,
-		user.Location,
-		user.Web,
-		user.Bio,
+		user.Location.String,
+		user.Web.String,
+		user.Bio.String,
 		user.Email,
 		user.Id,
 	)
@@ -337,6 +371,7 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 		&user.Bio,
 		&user.Web,
 		&user.Picture,
+		&user.TfaSecret,
 	)
 
 	if err != nil {
@@ -349,7 +384,7 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 
 		return nil, CustomError {
 			ErrGeneralDbErr,
-			errors.New("database error"),
+			errors.New(err.Error()),
 		}
 	}
 

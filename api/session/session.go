@@ -15,7 +15,7 @@ func ListSession(sessionStore postgres.SessionStoreInterface) http.HandlerFunc {
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		sessions, err := sessionStore.GetSessionByUserId(claim.UserId)
 		for _, s := range sessions{
-			s.IsCurrent = s.Id == claim.SessionId
+			s.IsCurrent = s.JwtId == claim.Id
 		}
 
 		if err != nil {

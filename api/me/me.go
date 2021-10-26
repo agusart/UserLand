@@ -3,12 +3,15 @@ package me
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	"net/http"
+	"strings"
 	"userland/api"
 	"userland/api/auth"
 	"userland/api/middleware"
 	"userland/store/postgres"
+	"userland/store/redis"
 )
 
 func UserDetail(userStore postgres.UserStoreInterface) http.HandlerFunc {
@@ -27,14 +30,33 @@ func UserDetail(userStore postgres.UserStoreInterface) http.HandlerFunc {
 	}
 }
 
-
 func UpdateUserDetail(userStore postgres.UserStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := UpdateUserDetailRequest{}
-		updatedUser, err := getUpdatedUserFromRequest(request, userStore, w, r)
-		if err != nil {
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if errMsg := request.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(api.Response{
+				"fields": errMsg,
+			})
+
 			return
 		}
+
+		updatedUser, err := getUpdatedUserFromRequest(request, userStore, claim)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		if updatedUser == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		err = userStore.UpdateUserBasicInfo(*updatedUser)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -44,12 +66,11 @@ func UpdateUserDetail(userStore postgres.UserStoreInterface) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"status" : true,
+			"status": true,
 		})
 
 	}
 }
-
 
 func GetCurrentEmailAddress(userStore postgres.UserStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -68,30 +89,67 @@ func GetCurrentEmailAddress(userStore postgres.UserStoreInterface) http.HandlerF
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"email" : existedUser.Email,
+			"email": existedUser.Email,
 		})
 	}
 }
 
-
-func UpdateUserEmail(userStore postgres.UserStoreInterface) http.HandlerFunc {
+func UpdateUserEmailRequest(cache redis.CacheInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := EmailAddressChangeRequset{}
-		updatedUser, err := getUpdatedUserFromRequest(request, userStore, w, r)
-		if err != nil {
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if errMsg := request.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(api.Response{
+				"fields": errMsg,
+			})
 			return
 		}
 
-		err = userStore.UpdateUserBasicInfo(*updatedUser)
+		err := cache.RequestChangeEmail(r.Context(), claim.UserId, request.Email, api.VerificationExpiredTime)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(api.Response{
+			"status": true,
+		})
+
+	}
+}
+
+
+func UpdateUserEmail(userStore postgres.UserStoreInterface, cache redis.CacheInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		verifyToken := chi.URLParam(r, "verifyToken")
+		if verifyToken == "" {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+		email, err := cache.GetVerifyChangeEmail(r.Context(), claim.UserId, strings.TrimSpace(verifyToken))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
+		err = userStore.ChangeUserEmail(claim.UserId, email)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"status" : true,
+			"status": true,
 		})
 
 	}
@@ -100,8 +158,21 @@ func UpdateUserEmail(userStore postgres.UserStoreInterface) http.HandlerFunc {
 func UpdateUserPassword(userStore postgres.UserStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := UpdatePasswordRequest{}
-		updatedUser, err := getUpdatedUserFromRequest(request, userStore, w, r)
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if errMsg := request.Validate(); len(errMsg) != 0 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(api.Response{
+				"fields": errMsg,
+			})
+
+			return
+		}
+
+		updatedUser, err := getUpdatedUserFromRequest(request, userStore, claim)
 		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
@@ -114,7 +185,7 @@ func UpdateUserPassword(userStore postgres.UserStoreInterface) http.HandlerFunc 
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"status" : true,
+			"status": true,
 		})
 	}
 }
@@ -147,15 +218,15 @@ func SetupTfa(userStore postgres.UserStoreInterface) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"secret" : secret,
-			"qr" : qrString,
+			"secret": secret,
+			"qr":     qrString,
 		})
 	}
 }
 
 func ActivateTfa(
 	userStore postgres.UserStoreInterface,
-	) http.HandlerFunc {
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		request := ActivateTfaRequest{}
@@ -166,9 +237,11 @@ func ActivateTfa(
 			_ = json.NewEncoder(w).Encode(api.Response{
 				"fields": errMsg,
 			})
+
+			return
 		}
 
-		success, err  := verifyTfaCode(request)
+		success, err := VerifyTfaCode(request)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -186,7 +259,6 @@ func ActivateTfa(
 		})
 	}
 }
-
 
 func RemoveTfa(
 	userStore postgres.UserStoreInterface,
@@ -219,7 +291,7 @@ func RemoveTfa(
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(postgres.CustomError{
 				StatusCode: api.ErrWrongPasswordCode,
-				Err: errors.New("invalid password"),
+				Err:        errors.New("invalid password"),
 			})
 			return
 		}
@@ -233,6 +305,29 @@ func RemoveTfa(
 
 		_ = json.NewEncoder(w).Encode(api.Response{
 			"success": true,
+		})
+	}
+}
+
+func GetCurrentTfaStatus(userStore postgres.UserStoreInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+		existedUser, err := userStore.GetUserById(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		if existedUser == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(api.Response{
+			"enabled": existedUser.TfaEnabled,
+			"enabled_at" : "",
 		})
 	}
 }
@@ -266,7 +361,7 @@ func DeleteAccount(userStore postgres.UserStoreInterface) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(postgres.CustomError{
 				StatusCode: api.ErrWrongPasswordCode,
-				Err: errors.New("invalid password"),
+				Err:        errors.New("invalid password"),
 			})
 			return
 		}
@@ -280,43 +375,25 @@ func DeleteAccount(userStore postgres.UserStoreInterface) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"success" : true,
+			"success": true,
 		})
 	}
 }
 
 func getUpdatedUserFromRequest(
-		request UserUpdateRequest,
-		userStore postgres.UserStoreInterface,
-		w http.ResponseWriter,
-		r *http.Request,
-	) (*postgres.User, error){
-		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
-		_ = json.NewDecoder(r.Body).Decode(&request)
+	request UserUpdateRequest,
+	userStore postgres.UserStoreInterface,
+	claim middleware.JWTClaims,
+) (*postgres.User, error) {
+	existedUser, err := userStore.GetUserById(claim.UserId)
+	if err != nil {
+		return nil, err
+	}
 
-		if errMsg := request.Validate(); len(errMsg) != 0 {
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_ = json.NewEncoder(w).Encode(api.Response{
-				"fields": errMsg,
-			})
-			return nil, fmt.Errorf("request has invalid input")
-		}
+	if existedUser == nil {
+		return nil, fmt.Errorf("existed user is nil")
+	}
 
-		existedUser, err := userStore.GetUserById(claim.UserId)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
-			return nil, err
-		}
-
-		if existedUser == nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return nil, fmt.Errorf("existed user is nil")
-		}
-
-		updatedUser := request.UpdateUser(*existedUser)
-
-		return &updatedUser, nil
+	updatedUser := request.UpdateUser(*existedUser)
+	return &updatedUser, nil
 }
-
-

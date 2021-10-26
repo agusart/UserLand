@@ -10,7 +10,7 @@ create table if not exists session (
 
 create table if not exists client (
     id serial primary key,
-    name text unique ,
+    name text unique,
     created_at timestamp,
     deleted_at timestamp
 );

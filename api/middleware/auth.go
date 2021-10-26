@@ -69,6 +69,7 @@ func (authMiddleware AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 		if !claim.TfaVerified {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
+		return
 	}
 
 	session, err := authMiddleware.cache.GetSessionCache(r.Context(), claim.UserId, claim.SessionId)

@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"userland/api"
 	"userland/api/auth"
+	"userland/api/me"
 	"userland/api/middleware"
 	"userland/api/session"
 	"userland/store/postgres"
@@ -34,6 +35,7 @@ func InitServer(db *sql.DB) *chi.Mux {
 	authStore := postgres.NewAuthStore(cache)
 	userStore := postgres.NewUserStore(db)
 	sessionStore := postgres.NewSessionStore(db)
+	tfaStore := postgres.NewTfaStore(db)
 
 	router = chi.NewMux()
 	authMiddleware := middleware.NewAuthMiddleware(jwtHandler, cache)
@@ -56,6 +58,22 @@ func InitServer(db *sql.DB) *chi.Mux {
 		r.Get("/session/refresh-token", session.RefreshToken(jwtHandler))
 		r.Get("/session/access-token", session.NewAccessToken(jwtHandler))
 
+		r.Get("/", me.UserDetail(userStore))
+		r.Post("/", me.UpdateUserDetail(userStore))
+
+		r.Get("/email", me.GetCurrentEmailAddress(userStore))
+		r.Post("/email", me.UpdateUserEmailRequest(cache))
+		r.Get("/email/verify/{verifyToken}", me.UpdateUserEmail(userStore, cache))
+		r.Post("/password", me.UpdateUserPassword(userStore))
+
+		r.Get("/tfa/status", me.GetCurrentTfaStatus(userStore))
+		r.Get("/tfa/enroll", me.SetupTfa(userStore))
+		r.Post("/tfa/enroll", me.ActivateTfa(userStore))
+		r.Post("/tfa/remove", me.RemoveTfa(userStore))
+		//r.Post("/tfa/verify", auth.VerifyTfa(jwtHandler, sessionStore))
+		//r.Post("/tfa/bypass", auth.BypassTfa(jwtHandler, tfaStore))
+
+		r.Post("/delete", me.DeleteAccount(userStore))
 	})
 
 	return router

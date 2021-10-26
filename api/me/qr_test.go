@@ -15,9 +15,8 @@ func TestGenerateQRString(t *testing.T) {
 	fmt.Println(res)
 }
 
-
 //func TestVerifyQR(t *testing.T) {
-//	ok, err := verifyTfaCode(ActivateTfaRequest{
+//	ok, err := VerifyTfaCode(ActivateTfaRequest{
 //		Secret: "MY3WI6LHNI======",
 //		Code: "512287",
 //	})
