@@ -1,7 +1,9 @@
 package api
 
 import (
+	"github.com/dgryski/dgoogauth"
 	"github.com/rs/zerolog/log"
+	"strings"
 	"userland/store/postgres"
 )
 
@@ -30,10 +32,24 @@ func GenerateErrorResponse(err error) ErrorResponse {
 		errMsg = "internal server error"
 		break
 	}
-	log.Err(err)
+	log.Print(err)
 	return ErrorResponse {
 		Code: errCode,
 		Message: errMsg,
 	}
+}
+
+
+func VerifyTfaCode(secret, code string) (bool, error) {
+	otpConfig := &dgoogauth.OTPConfig{
+		Secret:      strings.TrimSpace(secret),
+		WindowSize:  3,
+		HotpCounter: 0,
+	}
+
+	trimmedToken := strings.TrimSpace(code)
+	ok, err := otpConfig.Authenticate(trimmedToken)
+
+	return ok, err
 }
 

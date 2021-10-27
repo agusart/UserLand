@@ -22,7 +22,6 @@ type User struct {
 	Bio sql.NullString
 	Web sql.NullString
 	Picture sql.NullString
-	TfaSecret sql.NullString `json:"-"`
 }
 
 type UserStoreInterface interface {
@@ -34,9 +33,10 @@ type UserStoreInterface interface {
 	UpdateUserPassword(userId uint, newPassword string) error
 	UpdateUserBasicInfo(user User) error
 	SaveUserTfaSecret(secret string, userId uint) error
-	RemoveTfaStatus(userId uint) error
 	DeleteUser(userId uint) error
 	ChangeUserEmail(userId uint, email string) error
+	SavePasswordToHistory(userId uint, passwordHash string) error
+	GetPasswordHistory(userId uint) ([]string, error)
 }
 
 type UserStore struct {
@@ -44,6 +44,48 @@ type UserStore struct {
 	cache redis.CacheInterface
 }
 
+func (u UserStore) SavePasswordToHistory(userId uint, passwordHash string) error {
+	savePasswordSql := "insert into password_history(user_id, password, created_at) values ($1, $2, now()) returning id"
+
+	var insertedId int
+	row, err := QueryRowPrepareStatement(u.db, savePasswordSql, userId, passwordHash)
+	if err != nil {
+		return errors.New(err.Error())
+	}
+
+	err = row.Scan(&insertedId)
+	if err != nil {
+		return CustomError {
+			ErrCantInsertRegisterUser,
+			errors.New("failed to register"),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) GetPasswordHistory(userId uint) ([]string, error) {
+	sqlGetPasswordHistory := "select password from password_history where id = $1 order by created_at desc limit 3"
+	rows, err := QueryPrepareStatement(u.db, sqlGetPasswordHistory, userId)
+	if err != nil {
+		return nil,  errors.New(err.Error())
+	}
+
+	var res []string
+
+	for rows.Next() {
+		var passTmp string
+
+		err := rows.Scan(&passTmp)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, passTmp)
+	}
+
+	return res, nil
+}
 
 func (u UserStore) ChangeUserEmail(userId uint, email string) error {
 	sqlUpdateEmail := "update users set email=$1 where id=$2"
@@ -106,35 +148,7 @@ func (u UserStore) DeleteUser(userId uint) error {
 	return nil
 }
 
-func (u UserStore) RemoveTfaStatus(userId uint) error {
-	sqlRemoveTfaStatus := "update users set tfa_secret='', tfa_enabled=$1 where id=$2"
-	res, err := ExecPrepareStatement(
-		u.db,
-		sqlRemoveTfaStatus,
-		false,
-		userId,
-	)
-	if err != nil {
-		return err
-	}
 
-	rowAffected, err := res.RowsAffected()
-	if err != nil {
-		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
-		}
-	}
-
-	return nil
-}
 
 func (u UserStore) SaveUserTfaSecret(secret string, userId uint) error {
 	sqlUpdateUserSecret := "update users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
@@ -229,7 +243,7 @@ func (u UserStore) UpdateUserPassword(userId uint, newPassword string) error {
 		}
 	}
 
-	return nil
+	return u.SavePasswordToHistory(userId, newPassword)
 }
 
 func (u UserStore) VerifyUser(email string) error {
@@ -371,7 +385,6 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 		&user.Bio,
 		&user.Web,
 		&user.Picture,
-		&user.TfaSecret,
 	)
 
 	if err != nil {

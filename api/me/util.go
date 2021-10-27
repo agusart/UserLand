@@ -5,11 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"encoding/base64"
-	"github.com/dgryski/dgoogauth"
 	"github.com/skip2/go-qrcode"
 	"image"
 	"image/png"
-	"strings"
 )
 
 func randStr(strSize int, randType string) string {
@@ -66,17 +64,4 @@ func GenerateQRString(authLink string) (string, error) {
 	}
 
 	return getBase64String(code.Image(256)), nil
-}
-
-func VerifyTfaCode(request ActivateTfaRequest) (bool, error) {
-	otpConfig := &dgoogauth.OTPConfig{
-		Secret:      strings.TrimSpace(request.Secret),
-		WindowSize:  3,
-		HotpCounter: 0,
-	}
-
-	trimmedToken := strings.TrimSpace(request.Code)
-	ok, err := otpConfig.Authenticate(trimmedToken)
-
-	return ok, err
 }

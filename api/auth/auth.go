@@ -385,11 +385,12 @@ func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.Aut
 
 func VerifyTfa(
 	jwt middleware.JwtHandlerInterface,
-	sessionStore postgres.SessionStoreInterface,
+	userStore postgres.UserStoreInterface,
+	tfaStore postgres.TfaStoreInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		verifyTfaRequest := VerifyTfaRequest{}
-		_ = json.NewEncoder(w).Encode(&verifyTfaRequest)
+		_ = json.NewDecoder(r.Body).Decode(&verifyTfaRequest)
 
 		if errMsg := verifyTfaRequest.Validate(); len(errMsg) != 0 {
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -400,16 +401,37 @@ func VerifyTfa(
 		}
 
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
-
-		userSession, err := sessionStore.GetSessionById(claim.SessionId)
+		existingUser, err := userStore.GetUserById(claim.UserId)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
-		if userSession == nil {
-			w.WriteHeader(http.StatusUnauthorized)
+		if existingUser == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		tfaDetail, err  := tfaStore.GetUserTfaDetail(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+
+			return
+		}
+
+		success, err := api.VerifyTfaCode(tfaDetail.TfaSecret, verifyTfaRequest.Code)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+
+			return
+		}
+
+		if !success {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 

@@ -66,7 +66,7 @@ func QueryPrepareStatement(db *sql.DB, customSql string, args ...interface{}) (*
 
 
 func generateTfaCode() string {
-	code := time.Now().UnixNano() % 10000
+	code := time.Now().UnixNano() % 1000000
 	stringCode := fmt.Sprintf("%04d", code)
 
 	return stringCode

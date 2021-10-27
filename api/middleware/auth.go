@@ -65,12 +65,6 @@ func (authMiddleware AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if claim.UserHasTfa {
-		if !claim.TfaVerified {
-			w.WriteHeader(http.StatusUnauthorized)
-		}
-		return
-	}
 
 	session, err := authMiddleware.cache.GetSessionCache(r.Context(), claim.UserId, claim.SessionId)
 	if err != nil {
@@ -86,7 +80,5 @@ func (authMiddleware AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 	}
 
 	ctx := context.WithValue(r.Context(), api.ContextClaimsJwt, *claim)
-
-
 	authMiddleware.next.ServeHTTP(w, r.WithContext(ctx))
 }

@@ -173,6 +173,32 @@ func UpdateUserPassword(userStore postgres.UserStoreInterface) http.HandlerFunc 
 		updatedUser, err := getUpdatedUserFromRequest(request, userStore, claim)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+
+			return
+		}
+
+		oldPasswordList, err := userStore.GetPasswordHistory(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+
+			return
+		}
+
+		olPasswordDetected := false
+		for _, p := range oldPasswordList {
+			if auth.CheckPasswordHash(request.PasswordNew, p) {
+				olPasswordDetected = true
+				break
+			}
+		}
+
+		if olPasswordDetected {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.Response{
+				"messages" : "use password differently from your 3 last password",
+			})
 			return
 		}
 
@@ -225,7 +251,7 @@ func SetupTfa(userStore postgres.UserStoreInterface) http.HandlerFunc {
 }
 
 func ActivateTfa(
-	userStore postgres.UserStoreInterface,
+	tfaStore postgres.TfaStoreInterface,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
@@ -241,19 +267,24 @@ func ActivateTfa(
 			return
 		}
 
-		success, err := VerifyTfaCode(request)
+		success, err := api.VerifyTfaCode(request.Secret, request.Code)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		err = userStore.SaveUserTfaSecret(request.Secret, claim.UserId)
+		err = tfaStore.SaveUserTfaSecret(request.Secret, claim.UserId)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
-
+		_, err = tfaStore.CreateTfaBackupCode(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
 		_ = json.NewEncoder(w).Encode(api.Response{
 			"success": success,
 		})
@@ -262,6 +293,7 @@ func ActivateTfa(
 
 func RemoveTfa(
 	userStore postgres.UserStoreInterface,
+	tfaStore postgres.TfaStoreInterface,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
@@ -296,7 +328,7 @@ func RemoveTfa(
 			return
 		}
 
-		err = userStore.RemoveTfaStatus(claim.UserId)
+		err = tfaStore.RemoveTfaStatus(claim.UserId)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
