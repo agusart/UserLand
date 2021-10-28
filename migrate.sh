@@ -1,0 +1,1 @@
+migrate -path store/migrations -database "postgresql://user1:password@$(docker-machine ip test):5432/userland?sslmode=disable" -verbose $1 $2
