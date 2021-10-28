@@ -1,0 +1,774 @@
+{
+	"info": {
+		"_postman_id": "7310135b-354a-4ee9-88cb-8fc1e9aa92ea",
+		"name": "Userland",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"email\":\"a@gmail.com\",\"full_name\":\"Agus Budianto\",\"password\":\"Agus#12399@\", \"password_confirm\":\"Agus#12399@\"}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/register",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Forgot Password",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"aasdasf@gmail.com\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/password/forgot",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"password",
+						"forgot"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Password Confirm",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"token\": \"f584a2296ccbcdcdd16d7601a1afe5dd\",\n  \"password\": \"-/P4s5w0Rd_!?-N#w\",\n  \"password_confirm\": \"-/P4s5w0Rd_!?-N#w\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/password/reset",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"password",
+						"reset"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Request Verifi Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"type\": \"email.verify\",\n  \"recipient\": \"a@gmail.com\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/verification",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"verification"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "X-API-ClientID",
+						"value": "postman",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\"email\":\"a@gmail.com\",\"password\":\"Agus#12399@\"}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/login",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "TFA Bypass",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJVc2VySWQiOjIsIlVzZXJIYXNUZmEiOmZhbHNlLCJTZXNzaW9uSWQiOjUsIlRmYVZlcmlmaWVkIjpmYWxzZSwiZXhwIjoxNjM1Mzk3NzQwLCJqdGkiOiI0YzZmMzhkOS0yMGM3LTQyNDItOWUwNy0zNjMwZDk5MDg5NTQifQ.ZNNOsfDnhX4aeFuI3Q-tAVJw9hd7h29Gy1bnIgO6p3U",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"code\" : \"850436\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/tfa/verify",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"tfa",
+						"verify"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verify TFA Copy",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/verify/9674ed11cc4605f38549d2dba77f4ad2",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"verify",
+						"9674ed11cc4605f38549d2dba77f4ad2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Verify Register",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/auth/verify/9674ed11cc4605f38549d2dba77f4ad2",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"auth",
+						"verify",
+						"9674ed11cc4605f38549d2dba77f4ad2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Session",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "TFA enroll",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Activate TFA",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Current Email",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update User Email Request",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update User Email Request Verify",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Current Tfa Status",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Other Session",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session/other?",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session",
+						"other"
+					],
+					"query": [
+						{
+							"key": "",
+							"value": null
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "End Current Session",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Refresh Token",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session/refresh-token",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session",
+						"refresh-token"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Acces Token",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me/session/refresh-token",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me",
+						"session",
+						"refresh-token"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Detalil Profile",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Pic",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload Pic Copy",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://192.168.99.104:8080/me",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Edit Detail Profile",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fullname\": \"Awesome User\",\n  \"location\": \"Jakarta, Indonesia\",\n  \"bio\": \"my short bio\",\n  \"web\": \"http://wix.com\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/me",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Change Password",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{acces_token}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fullname\": \"Awesome User\",\n  \"location\": \"Jakarta, Indonesia\",\n  \"bio\": \"my short bio\",\n  \"web\": \"http://wix.com\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.99.104:8080/me",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"99",
+						"104"
+					],
+					"port": "8080",
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
