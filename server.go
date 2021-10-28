@@ -36,9 +36,12 @@ func InitServer(db *sql.DB) *chi.Mux {
 	userStore := postgres.NewUserStore(db)
 	sessionStore := postgres.NewSessionStore(db)
 	tfaStore := postgres.NewTfaStore(db)
+	fileHelper := me.FileHelper{}
 
 	router = chi.NewMux()
 	authMiddleware := middleware.NewAuthMiddleware(jwtHandler, cache)
+
+	router.Get("/asset/{filename}", me.ShowImages(fileHelper))
 
 	router.Route("/auth", func(r chi.Router) {
 		r.Post("/register", auth.Register(userStore, authStore))
@@ -47,12 +50,13 @@ func InitServer(db *sql.DB) *chi.Mux {
 		r.Post("/password/forgot", auth.ForgetPassword(userStore, authStore))
 		r.Post("/password/reset", auth.ResetPassword(userStore, authStore))
 		r.Post("/login", auth.Login(userStore, jwtHandler, sessionStore, authStore, cache))
-
+		r.With(authMiddleware.UserAuthMiddleware).Post("/tfa/verify", auth.VerifyTfa(jwtHandler, userStore, tfaStore))
+		r.With(authMiddleware.UserAuthMiddleware).Post("/tfa/bypass", auth.BypassTfa(jwtHandler, tfaStore))
 	})
 
 	router.Route("/me", func(r chi.Router) {
-		r.Use(authMiddleware.UserAuthMiddleware)
-		r.Get("/session", session.ListSession(sessionStore))
+		r.Use(authMiddleware.UserAuthMiddleware, middleware.TfaRequiredMiddleware)
+		r.With().Get("/session", session.ListSession(sessionStore))
 		r.Delete("/session", session.EndSession(sessionStore, cache))
 		r.Delete("/session/other", session.EndAllOtherSessions(sessionStore, cache))
 		r.Get("/session/refresh-token", session.RefreshToken(jwtHandler))
@@ -68,11 +72,10 @@ func InitServer(db *sql.DB) *chi.Mux {
 
 		r.Get("/tfa/status", me.GetCurrentTfaStatus(userStore))
 		r.Get("/tfa/enroll", me.SetupTfa(userStore))
-		r.Post("/tfa/enroll", me.ActivateTfa(userStore))
-		r.Post("/tfa/remove", me.RemoveTfa(userStore))
-		//r.Post("/tfa/verify", auth.VerifyTfa(jwtHandler, sessionStore))
-		//r.Post("/tfa/bypass", auth.BypassTfa(jwtHandler, tfaStore))
+		r.Post("/tfa/enroll", me.ActivateTfa(tfaStore))
+		r.Post("/tfa/remove", me.RemoveTfa(userStore, tfaStore))
 
+		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
 		r.Post("/delete", me.DeleteAccount(userStore))
 	})
 

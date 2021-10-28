@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/pkg/errors"
+	"log"
 	"time"
 )
 
@@ -11,9 +12,9 @@ type TfaDetail struct {
 	Id uint
 	UserId uint
 	TfaSecret string
-	CreatedAt time.Time
-	DeletedAt time.Time
-	ActivateAt time.Time
+	CreatedAt *time.Time
+	DeletedAt *time.Time
+	ActivateAt *time.Time
 }
 type TfaStoreInterface interface {
 	CheckTfaBackupCode(userId uint, tfaCode string) (bool, error)
@@ -79,6 +80,7 @@ func (t TfaStore) GetUserTfaDetail(userId uint) (*TfaDetail, error) {
 		)
 
 	if err != nil {
+		log.Print(err)
 		return nil, CustomError {
 			ErrGeneralDbErr,
 			errors.New("database error"),
@@ -89,7 +91,7 @@ func (t TfaStore) GetUserTfaDetail(userId uint) (*TfaDetail, error) {
 }
 
 func (t TfaStore) SaveUserTfaSecret(tfaSecret string, userId uint) error {
-	sqlStatement := "insert into tfa_detail (user_id, tfa_secret, created_at, activate_at) values ($1, $2, now(), now()) returning id"
+	sqlStatement := "insert into tfa_detail (user_id, tfa_secret, created_at, activate_at) values ($1, $2, now(), now()) on conflict(user_id) do update set activate_at = now() returning id"
 	row, err := QueryRowPrepareStatement(t.db, sqlStatement, userId, tfaSecret)
 	if err != nil {
 		return err
@@ -98,9 +100,10 @@ func (t TfaStore) SaveUserTfaSecret(tfaSecret string, userId uint) error {
 	var insertedId int
 	err = row.Scan(&insertedId)
 	if err != nil {
+		log.Print(err)
 		return CustomError {
 			ErrCantInsertRegisterUser,
-			errors.New("failed to register"),
+			errors.New("failed to activate tfa"),
 		}
 	}
 
@@ -122,13 +125,11 @@ func (t TfaStore) CheckTfaBackupCode(userId uint, tfaCode string) (bool, error) 
 
 	err = res.Scan(&id, &deletedAt)
 	if err != nil {
-		return false, CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
+		return false, generateErr(err)
 	}
+	log.Print(id, deletedAt)
 
-	return id != 0 && deletedAt !=nil , nil
+	return id != 0 && deletedAt == nil , nil
 }
 
 func (t TfaStore) DeleteTfaCode(userId uint, tfaCode string) error {
@@ -160,7 +161,7 @@ func (t TfaStore) CreateTfaBackupCode(userId uint) ([]string, error) {
 
 	for {
 		tfaCode := generateTfaCode()
-		res, err := QueryRowPrepareStatement(t.db, sqlInsertTfaCode, tfaCode, time.Now())
+		res, err := QueryRowPrepareStatement(t.db, sqlInsertTfaCode, userId, tfaCode, time.Now())
 		if err != nil {
 			return nil, err
 		}

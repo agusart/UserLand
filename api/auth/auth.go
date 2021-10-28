@@ -33,13 +33,13 @@ func Login(
 
 		loginUser, err := userStore.GetUserByEmail(loginRequest.Email)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		if !CheckPasswordHash(loginRequest.Password, loginUser.Password){
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code: api.ErrWrongPasswordCode,
 				Message: "incorrect password",
@@ -48,7 +48,7 @@ func Login(
 		}
 
 		if !loginUser.Verified{
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code: api.ErrUnverifiedCode,
 				Message: "Unverified User",
@@ -62,13 +62,13 @@ func Login(
 
 		clientName := r.Header.Get(api.ContextApiClientId)
 		if clientName == "" {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		client, err := sessionStore.CreateClient(clientName)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -91,7 +91,7 @@ func Login(
 		var accessToken *middleware.JWTToken
 		accessToken, err = jwt.GenerateAccessToken(claim)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -99,7 +99,7 @@ func Login(
 		createdSeason.JwtId = accessToken.Id
 		err = sessionStore.UpdateSession(*createdSeason)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -112,12 +112,11 @@ func Login(
 
 		err = cache.InsertSessionCache(r.Context(), sessionCache)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
-		log.Print(sessionStore)
 
 		if !loginUser.TfaEnabled {
 			w.WriteHeader(http.StatusOK)
@@ -131,14 +130,14 @@ func Login(
 
 		tfaToken, err := authStore.CreateTfaVerificationCode(r.Context(), loginUser.Email, api.TfaExpiredTime)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		success := api.SendTfaEmail(loginUser.Email, tfaToken)
 		if !success {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code: "ERR-TFA",
 				Message: "cant send tfa code",
@@ -170,7 +169,7 @@ func Register(userStore postgres.UserStoreInterface, authStore postgres.AuthStor
 		user := NewUserFromRegisterRequest(registerRequest)
 		err := userStore.RegisterUser(user)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			errResponse := api.GenerateErrorResponse(err)
 			_ = json.NewEncoder(w).Encode(errResponse)
 			return
@@ -260,13 +259,13 @@ func VerifyRegister(userStore postgres.UserStoreInterface, authStore postgres.Au
 
 		email, err := authStore.GetRegistrationCodeEmail(r.Context(), token)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 		err = userStore.VerifyUser(email)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -293,7 +292,7 @@ func ForgetPassword(userStore postgres.UserStoreInterface, authStore postgres.Au
 
 		existingUser, err := userStore.GetUserByEmail(forgetPasswordRequest.Email)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -304,7 +303,7 @@ func ForgetPassword(userStore postgres.UserStoreInterface, authStore postgres.Au
 		}
 
 		if existingUser.DeletedAt != nil && !existingUser.Verified {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				api.ErrBadRequestErrorCode,
 				"cant reset password",
@@ -314,7 +313,7 @@ func ForgetPassword(userStore postgres.UserStoreInterface, authStore postgres.Au
 
 		token, err := authStore.CreateForgotPasswordVerificationCode(r.Context(), existingUser.Email, api.ForgotPasswordExpiredTime)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -348,20 +347,20 @@ func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.Aut
 
 		email, err := authStore.GetResetPasswordCodeEmail(r.Context(), request.Token)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		existingUser, err := userStore.GetUserByEmail(email)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		if existingUser == nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -370,7 +369,7 @@ func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.Aut
 		newPassword, err :=  HashPassword(request.Password)
 		err = userStore.UpdateUserPassword(existingUser.Id, newPassword)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -403,20 +402,20 @@ func VerifyTfa(
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		existingUser, err := userStore.GetUserById(claim.UserId)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		if existingUser == nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		tfaDetail, err  := tfaStore.GetUserTfaDetail(claim.UserId)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 
 			return
@@ -424,21 +423,21 @@ func VerifyTfa(
 
 		success, err := api.VerifyTfaCode(tfaDetail.TfaSecret, verifyTfaRequest.Code)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 
 			return
 		}
 
 		if !success {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		claim.TfaVerified = true
 		tokenWithTfa, err  := jwt.GenerateAccessToken(claim)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -457,7 +456,7 @@ func BypassTfa(
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bypassTfaRequest := VerifyTfaRequest{}
-		_ = json.NewEncoder(w).Encode(&bypassTfaRequest)
+		_ = json.NewDecoder(r.Body).Decode(&bypassTfaRequest)
 
 		if errMsg := bypassTfaRequest.Validate(); len(errMsg) != 0 {
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -471,13 +470,20 @@ func BypassTfa(
 
 		success, err := tfaStore.CheckTfaBackupCode(claim.UserId, bypassTfaRequest.Code)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		err = tfaStore.DeleteTfaCode(claim.UserId, bypassTfaRequest.Code)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		if !success {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code : "ER-xx",
 				Message: "Code is incorrect",
@@ -488,7 +494,7 @@ func BypassTfa(
 		claim.TfaVerified = true
 		tokenWithTfa, err  :=jwt.GenerateAccessToken(claim)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}

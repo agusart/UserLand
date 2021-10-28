@@ -7,5 +7,4 @@ CREATE TABLE IF NOT EXISTS users(
     tfa_enabled BOOLEAN default false,
     created_at timestamp null,
     deleted_at timestamp null
-
 );

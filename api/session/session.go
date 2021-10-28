@@ -19,7 +19,7 @@ func ListSession(sessionStore postgres.SessionStoreInterface) http.HandlerFunc {
 		}
 
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -39,21 +39,21 @@ func EndSession(
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		currentSession, err := sessionStore.GetSessionById(claim.SessionId)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		err = sessionStore.DeleteSession(*currentSession)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 
 		err = cache.DeleteSessionCache(r.Context(), currentSession.UserId, currentSession.Id)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -74,7 +74,7 @@ func EndAllOtherSessions(
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		userSessionList, err := sessionStore.GetSessionByUserId(claim.UserId)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -103,7 +103,7 @@ func RefreshToken(
 		claim :=  r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 		refreshToken, err := jwt.GenerateRefreshToken(claim)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
@@ -125,7 +125,7 @@ func NewAccessToken(jwt middleware.JwtHandlerInterface) http.HandlerFunc {
 		}
 		refreshToken, err := jwt.GenerateAccessToken(claim)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}

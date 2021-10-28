@@ -67,7 +67,7 @@ func QueryPrepareStatement(db *sql.DB, customSql string, args ...interface{}) (*
 
 func generateTfaCode() string {
 	code := time.Now().UnixNano() % 1000000
-	stringCode := fmt.Sprintf("%04d", code)
+	stringCode := fmt.Sprintf("%06d", code)
 
 	return stringCode
 }
@@ -76,7 +76,7 @@ func generateErr(err error) error {
 	if err == sql.ErrNoRows {
 		return CustomError{
 			ErrUserNotfoundCode,
-			fmt.Errorf("user not found"),
+			fmt.Errorf("data not found"),
 		}
 	}
 

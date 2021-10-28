@@ -52,7 +52,7 @@ func (c CacheStore) InsertSessionCache(ctx context.Context, cache SessionCache) 
 	log.Print(key)
 	args := StructToArgs(cache)
 	err := c.client.HMSet(ctx, key, args...).Err()
-
+	log.Print(err)
 	return err
 }
 

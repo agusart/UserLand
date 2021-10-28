@@ -9,6 +9,11 @@ import (
 	"userland/store/redis"
 )
 
+type ImgInfo struct {
+	FileName string
+	OwnerId uint
+}
+
 type User struct {
 	Id uint
 	FullName string
@@ -37,11 +42,32 @@ type UserStoreInterface interface {
 	ChangeUserEmail(userId uint, email string) error
 	SavePasswordToHistory(userId uint, passwordHash string) error
 	GetPasswordHistory(userId uint) ([]string, error)
+	SaveImage(imgInfo ImgInfo) error
+	DeleteImage(userId uint) error
 }
 
 type UserStore struct {
 	db *sql.DB
 	cache redis.CacheInterface
+}
+
+func (u UserStore) DeleteImage(userId uint) error {
+	user, err := u.GetUserById(userId)
+	if err != nil {
+		return err
+	}
+
+	user.Picture = sql.NullString{String: nil}
+	return u.UpdateUserBasicInfo(*user)
+}
+func (u UserStore) SaveImage(imgInfo ImgInfo) error {
+	user, err := u.GetUserById(imgInfo.OwnerId)
+	if err != nil {
+		return err
+	}
+
+	user.Picture = sql.NullString{String: imgInfo.FileName, Valid: true}
+	return u.UpdateUserBasicInfo(*user)
 }
 
 func (u UserStore) SavePasswordToHistory(userId uint, passwordHash string) error {
@@ -189,7 +215,7 @@ func NewUserStore(db *sql.DB) UserStoreInterface {
 
 
 func (u UserStore) UpdateUserBasicInfo(user User) error {
-	updateBasicInfoSql := "update users set full_name=$1, location=$2, web=$3, bio=$4, email=$5 where id=$6"
+	updateBasicInfoSql := "update users set full_name=$1, location=$2, web=$3, bio=$4, email=$5, picture=$6 where id=$7"
 	res, err := ExecPrepareStatement(
 		u.db,
 		updateBasicInfoSql,
@@ -198,6 +224,7 @@ func (u UserStore) UpdateUserBasicInfo(user User) error {
 		user.Web.String,
 		user.Bio.String,
 		user.Email,
+		user.Picture.String,
 		user.Id,
 	)
 	if err != nil {
@@ -329,7 +356,7 @@ func (u UserStore) GetUserById(userId uint) (*User, error) {
 func (u UserStore) IsUserVerified(email string) (bool, error) {
 	user, err := u.GetUserByEmail(email)
 	if err != nil {
-		return false, errors.New(err.Error())
+		return false, err
 	}
 
 	if user == nil {
