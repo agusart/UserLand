@@ -76,6 +76,8 @@ func InitServer(db *sql.DB) *chi.Mux {
 		r.Post("/tfa/remove", me.RemoveTfa(userStore, tfaStore))
 
 		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
+		r.Delete("/picture", me.DeleteImages(userStore))
+
 		r.Post("/delete", me.DeleteAccount(userStore))
 	})
 

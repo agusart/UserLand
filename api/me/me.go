@@ -509,6 +509,37 @@ func ShowImages(fileHelper FileHelperInterface) func (w http.ResponseWriter, r *
 	}
 }
 
+
+func DeleteImages(userStore postgres.UserStoreInterface) func (w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
+		loginUser, err := userStore.GetUserById(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		if loginUser == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		err = userStore.DeleteImage(claim.UserId)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(api.Response{
+			"success" : true,
+		})
+
+	}
+}
+
 func getUpdatedUserFromRequest(
 	request UserUpdateRequest,
 	userStore postgres.UserStoreInterface,
