@@ -57,7 +57,7 @@ func (u UserStore) DeleteImage(userId uint) error {
 		return err
 	}
 
-	user.Picture = sql.NullString{String: nil}
+	user.Picture = sql.NullString{}
 	return u.UpdateUserBasicInfo(*user)
 }
 func (u UserStore) SaveImage(imgInfo ImgInfo) error {

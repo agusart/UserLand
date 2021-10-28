@@ -64,8 +64,6 @@ func (c CacheStore) GetSessionCache(ctx context.Context, userId, sessionId uint)
 		return nil, err
 	}
 
-	log.Print(sessionCache)
-
 	return &sessionCache, nil
 }
 

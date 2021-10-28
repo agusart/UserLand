@@ -9,11 +9,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/skip2/go-qrcode"
 	"image"
+	_ "image/jpeg"
 	"image/png"
 	"io"
 	"io/ioutil"
+	"log"
 	"mime/multipart"
-	"net/http"
 	"os"
 	"userland/store/postgres"
 )
@@ -85,16 +86,7 @@ type FileHelperInterface interface {
 type FileHelper struct {}
 
 func (f FileHelper) IsAllowedContentType(file multipart.File) (bool, error) {
-	fileHeader := make([]byte, 512)
-	_, _ = file.Read(fileHeader)
-
-	filTipe := http.DetectContentType(fileHeader)
-
-	if !IsValidImage(filTipe) {
-		return false, errors.New("ivalid img type")
-	}
-
-	return  IsValidImageDimension(file)
+	return IsValidImageDimension(file)
 }
 
 func (f FileHelper) ReadFile(filePath string) ([]byte, error) {
@@ -114,25 +106,16 @@ func (f FileHelper) Copy(dst io.Writer, src io.Reader) error {
 }
 
 
-func IsValidImage(category string) bool {
-	switch category {
-	case
-		"image/jpeg":
-		return true
-	}
-
-	return false
-}
-
-
 func IsValidImageDimension(f multipart.File) (bool, error){
 	defer f.Close()
 	im, _, err := image.DecodeConfig(f)
 	if err != nil {
-		return false, err
+		log.Print(err)
+		return false, errors.New("invalid image dimension")
 	}
 
+	log.Print(im.Height, im.Height)
 	return im.Width == im.Height &&
-		(im.Width > 200 && im.Width < 500) &&
-		(im.Height > 200 && im.Height < 500), nil
+		(im.Width >= 200 && im.Width <= 500) &&
+		(im.Height >= 200 && im.Height <= 500), nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"net/http"
 	"strings"
 	"userland/api"
@@ -428,9 +429,9 @@ func UploadPhoto(userRepository postgres.UserStoreInterface, fileHelper FileHelp
 
 		claim := r.Context().Value(api.ContextClaimsJwt).(middleware.JWTClaims)
 
-		r.ParseMultipartForm(200 * 1024 * 1024)
+		err := r.ParseMultipartForm(200 * 1024 * 1024)
 		file, multipartFileHeader, err := r.FormFile("file")
-		fmt.Println(err)
+
 		if err != nil {
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(api.Response{
@@ -440,28 +441,42 @@ func UploadPhoto(userRepository postgres.UserStoreInterface, fileHelper FileHelp
 		}
 		defer file.Close()
 
-		success, err := fileHelper.IsAllowedContentType(file);
+		success, err := fileHelper.IsAllowedContentType(file)
 		if err != nil {
+			log.Err(err)
 			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
+
 		if !success {
 			w.WriteHeader(http.StatusUnprocessableEntity)
+			_ = json.NewEncoder(w).Encode(api.Response{
+				"success" : false,
+			})
 			return
 		}
 
 
 		f, err := fileHelper.Create(multipartFileHeader.Filename)
+
+
 		if err != nil {
+			log.Err(err)
 			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
 		defer f.Close()
 
 		if err := fileHelper.Copy(f, file); err != nil {
+			log.Err(err)
 			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
 			return
 		}
+
+
 
 		w.WriteHeader(http.StatusOK)
 
@@ -472,6 +487,7 @@ func UploadPhoto(userRepository postgres.UserStoreInterface, fileHelper FileHelp
 
 		err = userRepository.SaveImage(imgInfo)
 		if err !=nil {
+			log.Err(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.Response{
 				"message": []string{"cant save image"},
@@ -481,7 +497,7 @@ func UploadPhoto(userRepository postgres.UserStoreInterface, fileHelper FileHelp
 
 
 		_ = json.NewEncoder(w).Encode(api.Response{
-			"message": "succes upload photo",
+			"message": "success upload photo",
 			"url":     r.Host + "/" + postgres.PhotoPath + "/" + f.Name(),
 		})
 	}
