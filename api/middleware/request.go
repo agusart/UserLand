@@ -14,3 +14,9 @@ func (middleware RequestMustBeJson) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 	middleware.Next.ServeHTTP(w, r)
 }
+
+func RequestMustBeJsonMiddleware(next http.Handler) http.Handler {
+	return RequestMustBeJson{
+		Next: next,
+	}
+}

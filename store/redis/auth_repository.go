@@ -16,10 +16,16 @@ type AuthStoreInterface interface {
 	GetResetPasswordCodeEmail(ctx context.Context, resetPasswordToken string) (string, error)
 	CreateTfaVerificationCode(ctx context.Context, email string, duration time.Duration) (string, error)
 	GetTfaCodeEmail(ctx context.Context, tfaCode string) (string, error)
+	InsertSessionCache(ctx context.Context, cache SessionCache) error
+
 }
 
 type AuthStore struct {
 	cache CacheInterface
+}
+
+func (a AuthStore) InsertSessionCache(ctx context.Context, cache SessionCache) error {
+	return a.InsertSessionCache(ctx, cache)
 }
 
 func NewAuthStore(db CacheInterface) AuthStoreInterface {
