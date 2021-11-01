@@ -16,7 +16,7 @@ func Login(
 	userStore postgres.UserStoreInterface,
 	jwt middleware.JwtHandlerInterface,
 	sessionStore postgres.SessionStoreInterface,
-	authStore postgres.AuthStoreInterface,
+	authStore redis.AuthStoreInterface,
 	cache redis.CacheInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func Login(
 	}
 }
 
-func Register(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
+func Register(userStore postgres.UserStoreInterface, authStore redis.AuthStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		registerRequest := RegisterRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&registerRequest)
@@ -195,7 +195,7 @@ func Register(userStore postgres.UserStoreInterface, authStore postgres.AuthStor
 	}
 }
 
-func RequestVerification(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
+func RequestVerification(userStore postgres.UserStoreInterface, authStore redis.AuthStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		verificationRequest := RegisterVerificationRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&verificationRequest)
@@ -245,7 +245,7 @@ func RequestVerification(userStore postgres.UserStoreInterface, authStore postgr
 	}
 }
 
-func VerifyRegister(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
+func VerifyRegister(userStore postgres.UserStoreInterface, authStore redis.AuthStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := chi.URLParam(r, "token")
 		if token == "" {
@@ -277,7 +277,7 @@ func VerifyRegister(userStore postgres.UserStoreInterface, authStore postgres.Au
 	}
 }
 
-func ForgetPassword(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
+func ForgetPassword(userStore postgres.UserStoreInterface, authStore redis.AuthStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		forgetPasswordRequest := ForgotPasswordRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&forgetPasswordRequest)
@@ -332,7 +332,7 @@ func ForgetPassword(userStore postgres.UserStoreInterface, authStore postgres.Au
 	}
 }
 
-func ResetPassword(userStore postgres.UserStoreInterface, authStore postgres.AuthStoreInterface) http.HandlerFunc {
+func ResetPassword(userStore postgres.UserStoreInterface, authStore redis.AuthStoreInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := ResetPasswordRequest{}
 		_ = json.NewDecoder(r.Body).Decode(&request)

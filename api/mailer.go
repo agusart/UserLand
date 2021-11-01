@@ -2,7 +2,7 @@ package api
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"net/smtp"
 	"os"
 )
@@ -46,7 +46,7 @@ func sendEmail(msg []byte, to string) bool {
 	err := smtp.SendMail(smtpAddress, auth, os.Getenv("SMTP_LOGIN"), []string{to}, msg)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Err(err)
 		return false
 	}
 

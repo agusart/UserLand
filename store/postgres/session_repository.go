@@ -38,41 +38,9 @@ type SessionStore struct {
 	db *sql.DB
 }
 
-func (s SessionStore) CreateClient(name string) (*ClientSession, error) {
-	insertClientQuery := "insert into client(name, created_at) values($1, $2) on conflict(name) do update set created_at = now() returning id"
-	var insertedId uint
-	createdAt := time.Now()
-	row, err := QueryRowPrepareStatement(
-		s.db,
-		insertClientQuery,
-		name,
-		createdAt,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = row.Scan(&insertedId)
-	if err != nil {
-		return nil, CustomError {
-			ErrCantInsertRegisterUser,
-			fmt.Errorf("failed to create client"),
-		}
-	}
-
-	return &ClientSession{
-		CreatedAt: createdAt,
-		Id: insertedId,
-		Name: name,
-
-	}, nil
-}
-
 func NewSessionStore(db *sql.DB) SessionStoreInterface {
 	return SessionStore{db: db}
 }
-
 
 func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 	insertSessionQuery := "insert into session(ip, jwt_id, user_id, client_id, created_at)" +
@@ -88,7 +56,7 @@ func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 		session.UserId,
 		session.Client.Id,
 		session.CreatedAt,
-		)
+	)
 
 	if err != nil {
 		return nil, err
@@ -97,8 +65,9 @@ func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 	err = row.Scan(&insertedId)
 	if err != nil {
 		return nil, CustomError {
-			ErrCantInsertRegisterUser,
-			fmt.Errorf("failed to register"),
+			ErrCantInsertUserSession,
+			"cant create session",
+			errors.Errorf("database error: %v", err),
 		}
 	}
 
@@ -119,23 +88,17 @@ func (s SessionStore) UpdateSession(session Session) error {
 		session.CreatedAt,
 		session.DeletedAt,
 		session.Id,
-		)
+	)
 	if err != nil {
 		return err
 	}
 
 	rowAffected, err := res.RowsAffected()
-	if err != nil {
+	if err != nil || rowAffected < 1 {
 		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantVerifyUser,
-			Err: fmt.Errorf("cant update session"),
+			ErrCantUpdateUserSession,
+			"cant update session",
+			errors.Errorf("database error: %v, row affected %d", err, rowAffected),
 		}
 	}
 
@@ -167,8 +130,41 @@ func (s SessionStore) GetSessionByUserId(userId uint) ([]Session, error) {
 	return s.getSessionFromRows(row)
 }
 
+func (s SessionStore) CreateClient(name string) (*ClientSession, error) {
+	insertClientQuery := "insert into client(name, created_at) values($1, $2) on conflict(name) do update set created_at = now() returning id"
+	var insertedId uint
+	createdAt := time.Now()
+	row, err := QueryRowPrepareStatement(
+		s.db,
+		insertClientQuery,
+		name,
+		createdAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = row.Scan(&insertedId)
+	if err != nil {
+		return nil, CustomError {
+			ErrCantInsertUserSession,
+			"failed create client",
+			fmt.Errorf("failed to create client: %v", err),
+		}
+	}
+
+	return &ClientSession{
+		CreatedAt: createdAt,
+		Id: insertedId,
+		Name: name,
+
+	}, nil
+}
+
 func (s SessionStore) getSessionFromRows(rows *sql.Rows) ([]Session, error){
 	defer rows.Close()
+
 	var sessions []Session
 	for rows.Next() {
 		session := Session{}
@@ -184,8 +180,13 @@ func (s SessionStore) getSessionFromRows(rows *sql.Rows) ([]Session, error){
 			)
 
 		if err !=nil {
-			return nil, err
+			return nil, CustomError{
+				ErrGeneralDbErr,
+				"internal server error",
+				errors.Errorf("database error: %v", err),
+			}
 		}
+
 		if session.DeletedAt.IsZero() {
 			sessions = append(sessions, session)
 		}
@@ -198,7 +199,6 @@ func (s SessionStore) getSessionFromRow(row *sql.Row) (*Session, error){
 	if row == nil {
 		return nil, fmt.Errorf("row from sql is nil")
 	}
-
 
 	var session Session
 	err := row.Scan(
@@ -215,15 +215,17 @@ func (s SessionStore) getSessionFromRow(row *sql.Row) (*Session, error){
 	if err != nil {
 		log.Print(err)
 		if err == sql.ErrNoRows {
-			return nil, CustomError{
+			return nil, CustomError {
 				ErrUserNotfoundCode,
-				fmt.Errorf("user not found"),
+				"user session not found",
+				errors.Errorf("database error: %v", err),
 			}
 		}
 
 		return nil, CustomError {
 			ErrGeneralDbErr,
-			errors.New("database error"),
+			"internal server error",
+			errors.Errorf("database error: %v", err),
 		}
 	}
 

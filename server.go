@@ -32,7 +32,7 @@ func InitServer(db *sql.DB) *chi.Mux {
 	redisClient := redis.InitRedisCache()
 	cache := redis.NewRedisCacheStore(redisClient)
 
-	authStore := postgres.NewAuthStore(cache)
+	authStore := redis.NewAuthStore(cache)
 	userStore := postgres.NewUserStore(db)
 	sessionStore := postgres.NewSessionStore(db)
 	tfaStore := postgres.NewTfaStore(db)

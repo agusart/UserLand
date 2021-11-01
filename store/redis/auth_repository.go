@@ -1,4 +1,4 @@
-package postgres
+package redis
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"time"
-	"userland/store/redis"
+	"userland/store/postgres"
 )
 
 type AuthStoreInterface interface {
@@ -19,10 +19,10 @@ type AuthStoreInterface interface {
 }
 
 type AuthStore struct {
-	cache redis.CacheInterface
+	cache CacheInterface
 }
 
-func NewAuthStore(db redis.CacheInterface) AuthStoreInterface {
+func NewAuthStore(db CacheInterface) AuthStoreInterface {
 	return AuthStore{cache: db}
 }
 
@@ -80,9 +80,9 @@ func (a AuthStore) getCode(ctx context.Context, token string) (string, error) {
 	email, err := a.cache.Get(ctx, token)
 	if err != nil {
 		log.Err(err)
-		return "", CustomError{
-			StatusCode: ErrCantVerifyUser,
-			Err: errors.New("cant verify User"),
+		return "", postgres.CustomError{
+			StatusCode: postgres.ErrCantVerifyUser,
+			Err:        errors.New("cant verify User"),
 		}
 	}
 

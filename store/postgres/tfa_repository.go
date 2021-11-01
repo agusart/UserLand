@@ -30,14 +30,10 @@ type TfaStore struct {
 	db *sql.DB
 }
 
-func (t TfaStore) RemoveTfaStatus(userId uint) error {
-	sqlRemoveTfaStatus := "update tfa_detail set deleted_at=now() where id=$2"
-	res, err := ExecPrepareStatement(
-		t.db,
-		sqlRemoveTfaStatus,
-		false,
-		userId,
-	)
+func (t TfaStore) DeleteTfaCode(userId uint, tfaCode string) error {
+	sqlDeleteStatement := "update tfa_backup_code set deleted_at = now() where user_id = $1 and code = $2"
+	res, err := ExecPrepareStatement(t.db, sqlDeleteStatement, userId, tfaCode)
+
 	if err != nil {
 		return err
 	}
@@ -46,65 +42,13 @@ func (t TfaStore) RemoveTfaStatus(userId uint) error {
 	if err != nil {
 		return CustomError {
 			ErrGeneralDbErr,
-			errors.New("database error"),
+			"Cant bypass tfa",
+			errors.Errorf("database error: %v", err),
 		}
 	}
 
 	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
-		}
-	}
-
-	return nil
-}
-
-func (t TfaStore) GetUserTfaDetail(userId uint) (*TfaDetail, error) {
-	sqlStatement := "select * from tfa_detail where user_id = $1"
-
-	tfaDetail := TfaDetail{}
-
-	res, err := QueryRowPrepareStatement(t.db, sqlStatement, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	err = res.Scan(
-		&tfaDetail.Id,
-		&tfaDetail.UserId,
-		&tfaDetail.TfaSecret,
-		&tfaDetail.CreatedAt,
-		&tfaDetail.DeletedAt,
-		&tfaDetail.ActivateAt,
-		)
-
-	if err != nil {
-		log.Print(err)
-		return nil, CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	return &tfaDetail , nil
-}
-
-func (t TfaStore) SaveUserTfaSecret(tfaSecret string, userId uint) error {
-	sqlStatement := "insert into tfa_detail (user_id, tfa_secret, created_at, activate_at) values ($1, $2, now(), now()) on conflict(user_id) do update set activate_at = now() returning id"
-	row, err := QueryRowPrepareStatement(t.db, sqlStatement, userId, tfaSecret)
-	if err != nil {
-		return err
-	}
-
-	var insertedId int
-	err = row.Scan(&insertedId)
-	if err != nil {
-		log.Print(err)
-		return CustomError {
-			ErrCantInsertRegisterUser,
-			errors.New("failed to activate tfa"),
-		}
+		return fmt.Errorf("cant delete tfa code")
 	}
 
 	return nil
@@ -132,28 +76,83 @@ func (t TfaStore) CheckTfaBackupCode(userId uint, tfaCode string) (bool, error) 
 	return id != 0 && deletedAt == nil , nil
 }
 
-func (t TfaStore) DeleteTfaCode(userId uint, tfaCode string) error {
-	sqlDeleteStatement := "update tfa_backup_code set deleted_at = now() where user_id = $1 and code = $2"
-	res, err := ExecPrepareStatement(t.db, sqlDeleteStatement, userId, tfaCode)
+func (t TfaStore) GetUserTfaDetail(userId uint) (*TfaDetail, error) {
+	sqlStatement := "select * from tfa_detail where user_id = $1"
 
+	tfaDetail := TfaDetail{}
+
+	res, err := QueryRowPrepareStatement(t.db, sqlStatement, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = res.Scan(
+		&tfaDetail.Id,
+		&tfaDetail.UserId,
+		&tfaDetail.TfaSecret,
+		&tfaDetail.CreatedAt,
+		&tfaDetail.DeletedAt,
+		&tfaDetail.ActivateAt,
+	)
+
+	if err != nil {
+		log.Print(err)
+		return nil, CustomError {
+			ErrGeneralDbErr,
+			"can't verify tfa",
+			errors.Errorf("database error: %v", err),
+		}
+	}
+
+	return &tfaDetail , nil
+}
+
+func (t TfaStore) RemoveTfaStatus(userId uint) error {
+	sqlRemoveTfaStatus := "update tfa_detail set deleted_at=now() where id=$2"
+	res, err := ExecPrepareStatement(
+		t.db,
+		sqlRemoveTfaStatus,
+		false,
+		userId,
+	)
 	if err != nil {
 		return err
 	}
 
 	rowAffected, err := res.RowsAffected()
-	if err != nil {
+	if err != nil || rowAffected < 1{
 		return CustomError {
 			ErrGeneralDbErr,
-			errors.New("database error"),
+			"cant deactivate tfa",
+			errors.Errorf("database error %v, rows affected: %d", err, rowAffected),
 		}
 	}
 
-	if rowAffected < 1 {
-		return fmt.Errorf("cant delete tfa code")
+
+	return nil
+}
+
+func (t TfaStore) SaveUserTfaSecret(tfaSecret string, userId uint) error {
+	sqlStatement := "insert into tfa_detail (user_id, tfa_secret, created_at, activate_at) values ($1, $2, now(), now()) on conflict(user_id) do update set activate_at = now() returning id"
+	row, err := QueryRowPrepareStatement(t.db, sqlStatement, userId, tfaSecret)
+	if err != nil {
+		return err
+	}
+
+	var insertedId int
+	err = row.Scan(&insertedId)
+	if err != nil {
+		log.Print(err)
+		return CustomError {
+			ErrCantUpdateUser,
+			"cant activate tfa",
+			errors.Errorf("database error: %v", err),
+		}
 	}
 
 	return nil
 }
+
 
 func (t TfaStore) CreateTfaBackupCode(userId uint) ([]string, error) {
 	var backupCodes []string

@@ -1,9 +1,9 @@
 create table if not exists session (
-    id serial PRIMARY KEY ,
+    id integer PRIMARY KEY ,
     user_id int not null,
     ip text,
     client_id int,
-    jwt_id text,
+    jwt_id text unique primary key ,
     created_at timestamp,
     deleted_at timestamp
 );

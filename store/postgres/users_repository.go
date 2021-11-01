@@ -2,11 +2,9 @@ package postgres
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"time"
-	"userland/store/redis"
 )
 
 type ImgInfo struct {
@@ -48,163 +46,6 @@ type UserStoreInterface interface {
 
 type UserStore struct {
 	db *sql.DB
-	cache redis.CacheInterface
-}
-
-func (u UserStore) DeleteImage(userId uint) error {
-	user, err := u.GetUserById(userId)
-	if err != nil {
-		return err
-	}
-
-	user.Picture = sql.NullString{}
-	return u.UpdateUserBasicInfo(*user)
-}
-func (u UserStore) SaveImage(imgInfo ImgInfo) error {
-	user, err := u.GetUserById(imgInfo.OwnerId)
-	if err != nil {
-		return err
-	}
-
-	user.Picture = sql.NullString{String: imgInfo.FileName, Valid: true}
-	return u.UpdateUserBasicInfo(*user)
-}
-
-func (u UserStore) SavePasswordToHistory(userId uint, passwordHash string) error {
-	savePasswordSql := "insert into password_history(user_id, password, created_at) values ($1, $2, now()) returning id"
-
-	var insertedId int
-	row, err := QueryRowPrepareStatement(u.db, savePasswordSql, userId, passwordHash)
-	if err != nil {
-		return errors.New(err.Error())
-	}
-
-	err = row.Scan(&insertedId)
-	if err != nil {
-		return CustomError {
-			ErrCantInsertRegisterUser,
-			errors.New("failed to register"),
-		}
-	}
-
-	return nil
-}
-
-func (u UserStore) GetPasswordHistory(userId uint) ([]string, error) {
-	sqlGetPasswordHistory := "select password from password_history where id = $1 order by created_at desc limit 3"
-	rows, err := QueryPrepareStatement(u.db, sqlGetPasswordHistory, userId)
-	if err != nil {
-		return nil,  errors.New(err.Error())
-	}
-
-	var res []string
-
-	for rows.Next() {
-		var passTmp string
-
-		err := rows.Scan(&passTmp)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, passTmp)
-	}
-
-	return res, nil
-}
-
-func (u UserStore) ChangeUserEmail(userId uint, email string) error {
-	sqlUpdateEmail := "update users set email=$1 where id=$2"
-	res, err := ExecPrepareStatement(
-		u.db,
-		sqlUpdateEmail,
-		email,
-		userId,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	rowAffected, err := res.RowsAffected()
-	if err != nil {
-		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
-		}
-	}
-
-	return nil
-}
-
-func (u UserStore) DeleteUser(userId uint) error {
-	sqlDeleteUser := "update users set deleted_at=now() where id=$1"
-	res, err := ExecPrepareStatement(
-		u.db,
-		sqlDeleteUser,
-		userId,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	rowAffected, err := res.RowsAffected()
-	if err != nil {
-		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
-		}
-	}
-
-	return nil
-}
-
-
-
-func (u UserStore) SaveUserTfaSecret(secret string, userId uint) error {
-	sqlUpdateUserSecret := "update users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
-	res, err := ExecPrepareStatement(
-		u.db,
-		sqlUpdateUserSecret,
-		secret,
-		true,
-		userId,
-	)
-	if err != nil {
-		return err
-	}
-
-	rowAffected, err := res.RowsAffected()
-	if err != nil {
-		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
-		}
-	}
-
-	return nil
 }
 
 func NewUserStore(db *sql.DB) UserStoreInterface {
@@ -213,6 +54,86 @@ func NewUserStore(db *sql.DB) UserStoreInterface {
 	}
 }
 
+func (u UserStore) GetUserByEmail(email string) (*User, error) {
+	getUserSql := "select * from users where email = $1"
+	row, err := QueryRowPrepareStatement(u.db, getUserSql, email)
+	if err != nil {
+		log.Err(err)
+		return nil, CustomError {
+			ErrUserNotfoundCode,
+			"user not found",
+			errors.Errorf("database error: %v", err),
+		}
+
+	}
+
+	return u.getUserFromRow(row)
+}
+
+func (u UserStore) GetUserById(userId uint) (*User, error) {
+	getUserSql := "select * from users where id = $1"
+	row, err := QueryRowPrepareStatement(u.db, getUserSql, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.getUserFromRow(row)
+}
+
+func (u UserStore) IsUserVerified(email string) (bool, error) {
+	user, err := u.GetUserByEmail(email)
+	if err != nil {
+		return false, err
+	}
+
+	if user == nil {
+		return false, CustomError {
+			ErrUserNotfoundCode,
+			"user not found",
+			errors.Errorf("database error: %v", err),
+		}
+	}
+
+	return user.Verified && user.DeletedAt == nil, nil
+}
+
+func (u UserStore) VerifyUser(email string) error {
+	updateSql := "UPDATE users set verified = true where email = $1"
+	res, err := ExecPrepareStatement(u.db, updateSql, email)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil || rowAffected < 1 {
+		return CustomError {
+			ErrCantVerifyUser,
+			"Cant verify user",
+			errors.Errorf("database error: %v, row affected: %d", err, rowAffected),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) UpdateUserPassword(userId uint, newPassword string) error {
+	updatePasswordSql := "UPDATE  users set password = $1 where id = $2"
+	res, err := ExecPrepareStatement(u.db, updatePasswordSql, newPassword, userId)
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil || rowAffected < 1 {
+		return CustomError{
+			ErrCantUpdateUser,
+			"cant update password",
+			errors.Errorf("error : %v, row affected: %d", err, rowAffected),
+		}
+	}
+
+	return u.SavePasswordToHistory(userId, newPassword)
+}
 
 func (u UserStore) UpdateUserBasicInfo(user User) error {
 	updateBasicInfoSql := "update users set full_name=$1, location=$2, web=$3, bio=$4, email=$5, picture=$6 where id=$7"
@@ -232,78 +153,167 @@ func (u UserStore) UpdateUserBasicInfo(user User) error {
 	}
 
 	rowAffected, err := res.RowsAffected()
-	if err != nil {
+	if err != nil || rowAffected < 1 {
 		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantUpdateUser,
-			Err: fmt.Errorf("cant update user"),
+			ErrCantUpdateUser,
+			"cant update user info",
+			errors.Errorf("database error: %v, row affected: %d", err, rowAffected),
 		}
 	}
 
 	return nil
 }
 
-
-
-func (u UserStore) UpdateUserPassword(userId uint, newPassword string) error {
-	updateSql := "UPDATE  users set password = $1 where id = $2"
-	res, err := ExecPrepareStatement(u.db, updateSql, newPassword, userId)
-	if err != nil {
-		return errors.New(err.Error())
-	}
-
-	rowAffected, err := res.RowsAffected()
-	if err != nil {
-		return errors.New(err.Error())
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantVerifyUser,
-			Err: errors.New("cant verify User"),
-		}
-	}
-
-	return u.SavePasswordToHistory(userId, newPassword)
-}
-
-func (u UserStore) VerifyUser(email string) error {
-	updateSql := "UPDATE users set verified = true where email = $1"
-	res, err := ExecPrepareStatement(u.db, updateSql, email)
+func (u UserStore) SaveUserTfaSecret(secret string, userId uint) error {
+	sqlUpdateUserSecret := "update users set tfa_secret=$1, tfa_enabled=$2 where id=$3"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlUpdateUserSecret,
+		secret,
+		true,
+		userId,
+	)
 	if err != nil {
 		return err
 	}
 
-
 	rowAffected, err := res.RowsAffected()
-	if err != nil {
+	if err != nil || rowAffected < 1{
 		return CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-	}
-
-	if rowAffected < 1 {
-		return CustomError{
-			StatusCode: ErrCantVerifyUser,
-			Err: errors.New("cant verify user"),
+			ErrCantUpdateUser,
+			"cant activate tfa",
+			errors.Errorf("database error: %v, row affected: %d", err, rowAffected),
 		}
 	}
 
 	return nil
 }
 
+func (u UserStore) DeleteUser(userId uint) error {
+	sqlDeleteUser := "update users set deleted_at=now() where id=$1"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlDeleteUser,
+		userId,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil || rowAffected < 1 {
+		return CustomError {
+			ErrCantDeleteUser,
+			"Error when try deleting account",
+			errors.Errorf("database error: %v, row affected: %d", err, rowAffected),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) ChangeUserEmail(userId uint, email string) error {
+	sqlUpdateEmail := "update users set email=$1 where id=$2"
+	res, err := ExecPrepareStatement(
+		u.db,
+		sqlUpdateEmail,
+		email,
+		userId,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	rowAffected, err := res.RowsAffected()
+	if err != nil || rowAffected < 1 {
+		return CustomError {
+			ErrCantUpdateUser,
+			"error when try change user email",
+			errors.Errorf("database error: %v, row affected: %d", err, rowAffected),
+		}
+	}
+
+	return nil
+}
+
+func (u UserStore) SavePasswordToHistory(userId uint, passwordHash string) error {
+	savePasswordSql := "insert into password_history(user_id, password, created_at) values ($1, $2, now()) returning id"
+
+	var insertedId int
+	row, err := QueryRowPrepareStatement(u.db, savePasswordSql, userId, passwordHash)
+	if err != nil {
+		return err
+	}
+
+	err = row.Scan(&insertedId)
+	if err != nil {
+		return CustomError {
+			ErrCantInsertRegisterUser,
+			"failed to register",
+			err,
+		}
+	}
+
+	return nil
+}
+
+
+func (u UserStore) GetPasswordHistory(userId uint) ([]string, error) {
+	sqlGetPasswordHistory := "select password from password_history where id = $1 order by created_at desc limit 3"
+	rows, err := QueryPrepareStatement(u.db, sqlGetPasswordHistory, userId)
+	if err != nil {
+		return nil,  err
+	}
+
+	var res []string
+
+	for rows.Next() {
+		var passTmp string
+
+		err := rows.Scan(&passTmp)
+		if err != nil {
+			return nil, errors.Errorf("cant scan history password: %v", err)
+		}
+
+		res = append(res, passTmp)
+	}
+
+	return res, nil
+}
+
+func (u UserStore) SaveImage(imgInfo ImgInfo) error {
+	user, err := u.GetUserById(imgInfo.OwnerId)
+	if err != nil {
+		return err
+	}
+
+	user.Picture = sql.NullString{String: imgInfo.FileName, Valid: true}
+	return u.UpdateUserBasicInfo(*user)
+}
+
+func (u UserStore) DeleteImage(userId uint) error {
+	user, err := u.GetUserById(userId)
+	if err != nil {
+		return err
+	}
+
+	user.Picture = sql.NullString{}
+	return u.UpdateUserBasicInfo(*user)
+}
+
 func (u UserStore) RegisterUser(user User) error {
-	existedUser, _ := u.GetUserByEmail(user.Email)
+	existedUser, err := u.GetUserByEmail(user.Email)
+	if err != nil {
+		return err
+	}
+
 	if existedUser != nil  {
+		err := errors.New("user already registered")
 		return CustomError{ErrUserAlreadyRegisteredCode,
-			errors.New("user already registered"),
+			err.Error(),
+			err,
 		}
 	}
 
@@ -319,54 +329,12 @@ func (u UserStore) RegisterUser(user User) error {
 	if err != nil {
 		return CustomError {
 			ErrCantInsertRegisterUser,
-			errors.New("failed to register"),
+			"error when register user",
+			errors.Errorf("database error: %d", err),
 		}
 	}
 
 	return nil
-}
-
-func (u UserStore) GetUserByEmail(email string) (*User, error) {
-	getUserSql := "select * from users where email = $1"
-	row, err := QueryRowPrepareStatement(u.db, getUserSql, email)
-	if err != nil {
-		log.Err(err)
-		return nil, CustomError {
-			ErrGeneralDbErr,
-			errors.New("database error"),
-		}
-
-	}
-
-	return u.getUserFromRow(row)
-}
-
-
-
-func (u UserStore) GetUserById(userId uint) (*User, error) {
-	getUserSql := "select * from users where id = $1"
-	row, err := QueryRowPrepareStatement(u.db, getUserSql, userId)
-	if err != nil {
-		return nil, errors.New(err.Error())
-	}
-
-	return u.getUserFromRow(row)
-}
-
-func (u UserStore) IsUserVerified(email string) (bool, error) {
-	user, err := u.GetUserByEmail(email)
-	if err != nil {
-		return false, err
-	}
-
-	if user == nil {
-		return false, CustomError {
-			ErrUserNotfoundCode,
-			errors.New("user not found"),
-		}
-	}
-
-	return user.Verified && user.DeletedAt == nil, nil
 }
 
 func (u UserStore) isUserExisted(email string) (bool, error) {
@@ -379,14 +347,15 @@ func (u UserStore) isUserExisted(email string) (bool, error) {
 
 	res, err := QueryRowPrepareStatement(u.db, sqlUserExistCheck, email)
 	if err != nil {
-		return false, errors.New(err.Error())
+		return false, err
 	}
 
 	err = res.Scan(&id, &deletedAt)
 	if err != nil {
 		return false, CustomError {
 			ErrGeneralDbErr,
-			errors.New("database error"),
+			"internal server error",
+			errors.Errorf("database error: %v", err),
 		}
 	}
 
@@ -418,13 +387,15 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 		if err == sql.ErrNoRows {
 			return nil, CustomError{
 				ErrUserNotfoundCode,
-				errors.New("user not found"),
+				"user not found",
+				errors.Errorf("database error: %v", err),
 			}
 		}
 
 		return nil, CustomError {
 			ErrGeneralDbErr,
-			errors.New(err.Error()),
+			"internal server error",
+			errors.Errorf("database error: %v", err.Error()),
 		}
 	}
 
