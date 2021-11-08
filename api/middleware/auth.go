@@ -44,6 +44,11 @@ func (authMiddleware AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if strings.ToUpper(tokens[0]) != "BEARER" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	token := tokens[1]
 	claim, err := authMiddleware.jwt.ClaimToken(token)
 
@@ -65,8 +70,7 @@ func (authMiddleware AuthMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-
-	session, err := authMiddleware.cache.GetSessionCache(r.Context(), claim.UserId, claim.SessionId)
+	session, err := authMiddleware.cache.GetSessionCache(context.Background(), claim.UserId, claim.SessionId)
 	if err != nil {
 		log.Print(err)
 		w.WriteHeader(http.StatusUnauthorized)

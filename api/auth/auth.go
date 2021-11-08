@@ -17,7 +17,6 @@ func Login(
 	jwt middleware.JwtHandlerInterface,
 	sessionStore postgres.SessionStoreInterface,
 	authStore redis.AuthStoreInterface,
-	cache redis.CacheInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginRequest := LoginRequest{}
@@ -110,7 +109,7 @@ func Login(
 			JwtId: accessToken.Id,
 		}
 
-		err = cache.InsertSessionCache(r.Context(), sessionCache)
+		err = authStore.InsertSessionCache(r.Context(), sessionCache)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
