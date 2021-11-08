@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"userland/api"
 	"userland/api/middleware"
+	"userland/store/broker"
 	"userland/store/postgres"
 	"userland/store/redis"
 )
@@ -17,6 +18,7 @@ func Login(
 	jwt middleware.JwtHandlerInterface,
 	sessionStore postgres.SessionStoreInterface,
 	authStore redis.AuthStoreInterface,
+	msgBroker broker.BrokerInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginRequest := LoginRequest{}
@@ -57,6 +59,7 @@ func Login(
 
 		session := postgres.Session{
 			UserId: loginUser.Id,
+			IP: r.RemoteAddr,
 		}
 
 		clientName := r.Header.Get(api.ContextApiClientId)
@@ -142,6 +145,18 @@ func Login(
 				Message: "cant send tfa code",
 			})
 			return
+		}
+
+		userLogJob := broker.UserLoginLogJob{
+			LoggedInAt: createdSeason.CreatedAt,
+			SessionName: createdSeason.Client.Name,
+			LoggedInIp: createdSeason.IP,
+			UserId: createdSeason.UserId,
+		}
+
+		err = msgBroker.SendLog(broker.BrokerLogTopicName, userLogJob)
+		if err != nil {
+			log.Err(err)
 		}
 
 		w.WriteHeader(http.StatusOK)

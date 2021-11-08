@@ -2,11 +2,11 @@ FROM golang:latest
 
 LABEL maintainer="Agus Budianto <agus.kbk@gmail.com>"
 
+RUN mkdir /asset
+
 WORKDIR /app
 
 COPY . .
-
-RUN mkdir /asset
 
 RUN go mod download
 

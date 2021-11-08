@@ -3,7 +3,7 @@ create table if not exists session (
     user_id int not null,
     ip text,
     client_id int,
-    jwt_id text unique primary key ,
+    jwt_id text unique,
     created_at timestamp,
     deleted_at timestamp
 );

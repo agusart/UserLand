@@ -106,7 +106,7 @@ func TestRequireTokenAuthenticationSuccess(t *testing.T) {
 
 	session := redis.SessionCache{JwtId: Claim.Id}
 
-	cache.EXPECT().GetSessionCache(request.Context(), Claim.UserId, Claim.SessionId).Return(&session, nil)
+	cache.EXPECT().GetSessionCache(gomock.Any(), Claim.UserId, Claim.SessionId).Return(&session, nil)
 
 	Router.ServeHTTP(response, request)
 
@@ -140,7 +140,7 @@ func TestRequireTfaFail(t *testing.T) {
 
 	session := redis.SessionCache{JwtId: Claim.Id}
 
-	cache.EXPECT().GetSessionCache(request.Context(), Claim.UserId, Claim.SessionId).Return(&session, nil)
+	cache.EXPECT().GetSessionCache(gomock.Any(), Claim.UserId, Claim.SessionId).Return(&session, nil)
 
 	Router.ServeHTTP(response, request)
 
@@ -173,7 +173,7 @@ func TestRequireTfaSuccess(t *testing.T) {
 
 	session := redis.SessionCache{JwtId: Claim.Id}
 
-	cache.EXPECT().GetSessionCache(request.Context(), Claim.UserId, Claim.SessionId).Return(&session, nil)
+	cache.EXPECT().GetSessionCache(gomock.Any(), Claim.UserId, Claim.SessionId).Return(&session, nil)
 
 	Router.ServeHTTP(response, request)
 
