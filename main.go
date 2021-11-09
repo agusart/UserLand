@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/joho/godotenv"
@@ -91,7 +90,7 @@ func main() {
 		endWorkerChan <- 1
 	}()
 
-	go worker.UserLoginLog(context.Background(), msgBroker, logStore, endWorkerChan)
+	go worker.UserLoginLog(msgBroker, logStore, endWorkerChan)
 
 	_ = http.ListenAndServe(":8080", r)
 }

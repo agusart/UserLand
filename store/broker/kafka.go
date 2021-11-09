@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-const BrokerLogTopicName = "user_login_log"
+const MsgBrokerLogTopicName = "user_login_log"
 
-var broker BrokerInterface
+var broker MessageBrokerInterface
 
 type UserLoginLogJob struct {
 	LoggedInAt time.Time `json:"logged_in_at"`
@@ -19,7 +19,7 @@ type UserLoginLogJob struct {
 
 
 
-type BrokerInterface interface {
+type MessageBrokerInterface interface {
 	SendLog(topic string, log UserLoginLogJob) error
 	GetConsumer() *kafka.Consumer
 	TearDown()
@@ -53,7 +53,7 @@ func (b Broker) TearDown(){
 	close(b.logChan)
 }
 
-func NewBroker (consumerCfg *kafka.ConfigMap, producerCfg *kafka.ConfigMap) (BrokerInterface, error) {
+func NewBroker (consumerCfg *kafka.ConfigMap, producerCfg *kafka.ConfigMap) (MessageBrokerInterface, error) {
 	if broker != nil {
 		return broker, nil
 	}

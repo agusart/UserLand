@@ -31,7 +31,7 @@ type LogStore struct {
 }
 
 func (l LogStore) WriteUserLog(userLog UserLog) error {
-	insertLogQuery := "insert into audit_logs (user_id, session_id, remote_ip, created_at) values($1, $2, $3, $4)"
+	insertLogQuery := "insert into audit_logs (user_id, session_id, remote_ip, created_at) values($1, $2, $3, $4) returning id"
 	userLog.CreatedAt = time.Now()
 
 	var insertedId uint

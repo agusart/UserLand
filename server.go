@@ -21,7 +21,7 @@ func InitRouter(
 	authStore redis.AuthStoreInterface,
 	sessionStore postgres.SessionStoreInterface,
 	tfaStore postgres.TfaStoreInterface,
-	broker broker.BrokerInterface,
+	broker broker.MessageBrokerInterface,
 ) *chi.Mux {
 	if router != nil {
 		return router
@@ -45,29 +45,32 @@ func InitRouter(
 
 	router.Route("/me", func(r chi.Router) {
 		r.Use(authMiddleware.UserAuthMiddleware, middleware.TfaRequiredMiddleware)
-		r.With().Get("/session", session.ListSession(sessionStore))
+
+		r.Get("/session", session.ListSession(sessionStore))
 		r.Delete("/session", session.EndSession(sessionStore, cache))
 		r.Delete("/session/other", session.EndAllOtherSessions(sessionStore, cache))
 		r.Get("/session/refresh-token", session.RefreshToken(jwtHandler))
 		r.Get("/session/access-token", session.NewAccessToken(jwtHandler))
 
 		r.Get("/", me.UserDetail(userStore))
-		r.Post("/", me.UpdateUserDetail(userStore))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/", me.UpdateUserDetail(userStore))
 
 		r.Get("/email", me.GetCurrentEmailAddress(userStore))
-		r.Post("/email", me.UpdateUserEmailRequest(cache))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/email", me.UpdateUserEmailRequest(cache))
 		r.Get("/email/verify/{verifyToken}", me.UpdateUserEmail(userStore, cache))
-		r.Post("/password", me.UpdateUserPassword(userStore))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/password", me.UpdateUserPassword(userStore))
 
 		r.Get("/tfa/status", me.GetCurrentTfaStatus(userStore))
 		r.Get("/tfa/enroll", me.SetupTfa(userStore))
-		r.Post("/tfa/enroll", me.ActivateTfa(tfaStore))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/tfa/enroll", me.ActivateTfa(tfaStore))
 		r.Post("/tfa/remove", me.RemoveTfa(userStore, tfaStore))
 
-		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
-		r.Delete("/picture", me.DeleteImages(userStore))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/delete", me.DeleteAccount(userStore))
 
-		r.Post("/delete", me.DeleteAccount(userStore))
+
+		r.Delete("/picture", me.DeleteImages(userStore))
+		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
+
 	})
 
 	return router

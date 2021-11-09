@@ -1,22 +1,21 @@
 package worker
 
 import (
-	"context"
 	"encoding/json"
-	"github.com/rs/zerolog/log"
+	"fmt"
 	"userland/store/broker"
 	"userland/store/postgres"
 )
 
 func UserLoginLog(
-	ctx context.Context,
-	msgBroker broker.BrokerInterface,
+	msgBroker broker.MessageBrokerInterface,
 	logStore postgres.LogStoreInterface,
 	endChan <-chan int) {
+	fmt.Println("worker starting")
 	c := msgBroker.GetConsumer()
-	err := c.SubscribeTopics([]string{broker.BrokerLogTopicName}, nil)
+	err := c.SubscribeTopics([]string{broker.MsgBrokerLogTopicName}, nil)
 	if err != nil {
-		log.Err(err)
+		fmt.Println(err)
 	}
 
 	for {
@@ -26,12 +25,14 @@ func UserLoginLog(
 		default:
 			msg, err := c.ReadMessage(-1)
 			if err != nil {
+				fmt.Println(err)
 				continue
 			}
 
 			job := broker.UserLoginLogJob{}
-			err = json.Unmarshal([]byte(msg.String()), &job)
+			err = json.Unmarshal(msg.Value, &job)
 			if err != nil {
+				fmt.Println(err)
 				continue
 			}
 
@@ -44,10 +45,15 @@ func UserLoginLog(
 
 			err = logStore.WriteUserLog(logUserLogin)
 			if err != nil {
-				log.Err(err)
+				fmt.Println(err)
+				continue
 			}
 
+			fmt.Println("success save log")
 		}
 	}
+
+
+
 
 }

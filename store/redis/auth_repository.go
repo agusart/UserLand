@@ -25,7 +25,7 @@ type AuthStore struct {
 }
 
 func (a AuthStore) InsertSessionCache(ctx context.Context, cache SessionCache) error {
-	return a.InsertSessionCache(ctx, cache)
+	return a.cache.InsertSessionCache(ctx, cache)
 }
 
 func NewAuthStore(db CacheInterface) AuthStoreInterface {

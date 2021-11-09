@@ -43,8 +43,17 @@ func NewSessionStore(db *sql.DB) SessionStoreInterface {
 }
 
 func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
-	insertSessionQuery := "insert into session(ip, jwt_id, user_id, client_id, created_at)" +
-		"VALUES ($1, $2, $3, $4, $5) RETURNING id"
+	insertSessionQuery := `
+		insert into session(
+  			ip, jwt_id, user_id, client_id, created_at
+		) 
+		values 
+  			($1, $2, $3, $4, $5) on conflict(user_id, client_id) do 
+		update 
+		set 
+			ip = $6, 
+  			jwt_id = $7,
+			created_at = now() returning id`
 
 	session.CreatedAt = time.Now()
 	var insertedId uint
@@ -56,6 +65,8 @@ func (s SessionStore) CreateNewSession(session Session) (*Session, error) {
 		session.UserId,
 		session.Client.Id,
 		session.CreatedAt,
+		session.IP,
+		session.JwtId,
 	)
 
 	if err != nil {

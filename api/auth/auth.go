@@ -18,7 +18,7 @@ func Login(
 	jwt middleware.JwtHandlerInterface,
 	sessionStore postgres.SessionStoreInterface,
 	authStore redis.AuthStoreInterface,
-	msgBroker broker.BrokerInterface,
+	msgBroker broker.MessageBrokerInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginRequest := LoginRequest{}
@@ -48,7 +48,7 @@ func Login(
 			return
 		}
 
-		if !loginUser.Verified{
+		if !loginUser.Verified {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code: api.ErrUnverifiedCode,
@@ -57,15 +57,15 @@ func Login(
 			return
 		}
 
-		session := postgres.Session{
-			UserId: loginUser.Id,
-			IP: r.RemoteAddr,
-		}
-
 		clientName := r.Header.Get(api.ContextApiClientId)
 		if clientName == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
+		}
+
+		session := postgres.Session{
+			UserId: loginUser.Id,
+			IP: r.RemoteAddr,
 		}
 
 		client, err := sessionStore.CreateClient(clientName)
@@ -77,6 +77,13 @@ func Login(
 
 		session.Client = *client
 		createdSeason, err := sessionStore.CreateNewSession(session)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
 		if createdSeason == nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -119,8 +126,12 @@ func Login(
 			return
 		}
 
-
 		if !loginUser.TfaEnabled {
+			err = SendLog(msgBroker, *createdSeason)
+			if err != nil {
+				log.Err(err)
+			}
+
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(LoginResponse{
 				RequireTfa: loginUser.TfaEnabled,
@@ -147,14 +158,7 @@ func Login(
 			return
 		}
 
-		userLogJob := broker.UserLoginLogJob{
-			LoggedInAt: createdSeason.CreatedAt,
-			SessionName: createdSeason.Client.Name,
-			LoggedInIp: createdSeason.IP,
-			UserId: createdSeason.UserId,
-		}
-
-		err = msgBroker.SendLog(broker.BrokerLogTopicName, userLogJob)
+		err = SendLog(msgBroker, *createdSeason)
 		if err != nil {
 			log.Err(err)
 		}
