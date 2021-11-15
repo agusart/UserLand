@@ -7,6 +7,8 @@ import (
 	"userland/store/postgres"
 )
 
+const KafkaWaitTimeout = -1
+
 func UserLoginLog(
 	msgBroker broker.MessageBrokerInterface,
 	logStore postgres.LogStoreInterface,
@@ -23,7 +25,7 @@ func UserLoginLog(
 		case <-endChan:
 			return
 		default:
-			msg, err := c.ReadMessage(-1)
+			msg, err := c.ReadMessage(KafkaWaitTimeout)
 			if err != nil {
 				fmt.Println(err)
 				continue

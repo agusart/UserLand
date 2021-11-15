@@ -19,6 +19,9 @@ import (
 	"userland/store/redis"
 )
 
+const BootstrapServers = "BOOTSTRAPSERVERS"
+const ConsumerGroupId = "userland"
+
 func main() {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	err := godotenv.Load()
@@ -61,12 +64,12 @@ func main() {
 	fileHelper := me.FileHelper{}
 
 	consumerBrokerConfig := &kafka.ConfigMap{
-		"bootstrap.servers": os.Getenv("BOOTSTRAPSERVERS"),
-		"group.id":          "userland",
+		"bootstrap.servers": os.Getenv(BootstrapServers),
+		"group.id":          ConsumerGroupId,
 	}
 
 	producerBrokerConfig := &kafka.ConfigMap{
-		"bootstrap.servers": os.Getenv("BOOTSTRAPSERVERS"),
+		"bootstrap.servers": os.Getenv(BootstrapServers),
 	}
 
 	msgBroker, err := broker.NewBroker(consumerBrokerConfig, producerBrokerConfig)

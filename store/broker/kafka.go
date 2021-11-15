@@ -22,15 +22,12 @@ type UserLoginLogJob struct {
 type MessageBrokerInterface interface {
 	SendLog(topic string, log UserLoginLogJob) error
 	GetConsumer() *kafka.Consumer
-	TearDown()
 }
 
 
 type Broker struct {
 	producer *kafka.Producer
 	consumer *kafka.Consumer
-	logChan chan UserLoginLogJob
-
 }
 
 func (b Broker) SendLog(topic string, log UserLoginLogJob) error {
@@ -47,10 +44,6 @@ func (b Broker) SendLog(topic string, log UserLoginLogJob) error {
 
 func (b Broker) GetConsumer() *kafka.Consumer {
 	return b.consumer
-}
-
-func (b Broker) TearDown(){
-	close(b.logChan)
 }
 
 func NewBroker (consumerCfg *kafka.ConfigMap, producerCfg *kafka.ConfigMap) (MessageBrokerInterface, error) {
@@ -72,8 +65,6 @@ func NewBroker (consumerCfg *kafka.ConfigMap, producerCfg *kafka.ConfigMap) (Mes
 		producer: p,
 		consumer: c,
 	}
-
-	broker.logChan = make(chan UserLoginLogJob)
 
 	return broker, nil
 }
