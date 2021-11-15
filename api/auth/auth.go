@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"userland/api"
 	"userland/api/middleware"
+	"userland/store/broker"
 	"userland/store/postgres"
 	"userland/store/redis"
 )
@@ -17,6 +18,7 @@ func Login(
 	jwt middleware.JwtHandlerInterface,
 	sessionStore postgres.SessionStoreInterface,
 	authStore redis.AuthStoreInterface,
+	msgBroker broker.MessageBrokerInterface,
 	) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginRequest := LoginRequest{}
@@ -46,7 +48,7 @@ func Login(
 			return
 		}
 
-		if !loginUser.Verified{
+		if !loginUser.Verified {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(api.ErrorResponse{
 				Code: api.ErrUnverifiedCode,
@@ -55,14 +57,15 @@ func Login(
 			return
 		}
 
-		session := postgres.Session{
-			UserId: loginUser.Id,
-		}
-
 		clientName := r.Header.Get(api.ContextApiClientId)
 		if clientName == "" {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
+		}
+
+		session := postgres.Session{
+			UserId: loginUser.Id,
+			IP: r.RemoteAddr,
 		}
 
 		client, err := sessionStore.CreateClient(clientName)
@@ -74,6 +77,13 @@ func Login(
 
 		session.Client = *client
 		createdSeason, err := sessionStore.CreateNewSession(session)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(api.GenerateErrorResponse(err))
+			return
+		}
+
 		if createdSeason == nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -116,8 +126,12 @@ func Login(
 			return
 		}
 
-
 		if !loginUser.TfaEnabled {
+			err = SendLog(msgBroker, *createdSeason)
+			if err != nil {
+				log.Err(err)
+			}
+
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(LoginResponse{
 				RequireTfa: loginUser.TfaEnabled,
@@ -142,6 +156,11 @@ func Login(
 				Message: "cant send tfa code",
 			})
 			return
+		}
+
+		err = SendLog(msgBroker, *createdSeason)
+		if err != nil {
+			log.Err(err)
 		}
 
 		w.WriteHeader(http.StatusOK)

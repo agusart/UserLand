@@ -5,6 +5,7 @@ import (
 	"net/mail"
 	"unicode"
 	"userland/api"
+	"userland/store/broker"
 	"userland/store/postgres"
 )
 
@@ -60,4 +61,14 @@ func CheckPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
+func SendLog(msgBroker broker.MessageBrokerInterface, createdSeason postgres.Session) error {
+	userLogJob := broker.UserLoginLogJob{
+		LoggedInAt: createdSeason.CreatedAt,
+		SessionId: createdSeason.Id,
+		LoggedInIp: createdSeason.IP,
+		UserId: createdSeason.UserId,
+	}
+
+	return msgBroker.SendLog(broker.MsgBrokerLogTopicName, userLogJob)
+}
 

@@ -1,0 +1,1 @@
+alter table session add constraint uniq_client_id unique(user_id, client_id);

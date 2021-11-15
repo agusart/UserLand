@@ -3,7 +3,6 @@ package postgres
 import (
 	"database/sql"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"time"
 )
 
@@ -58,7 +57,6 @@ func (u UserStore) GetUserByEmail(email string) (*User, error) {
 	getUserSql := "select * from users where email = $1"
 	row, err := QueryRowPrepareStatement(u.db, getUserSql, email)
 	if err != nil {
-		log.Err(err)
 		return nil, CustomError {
 			ErrUserNotfoundCode,
 			"user not found",
@@ -305,7 +303,7 @@ func (u UserStore) DeleteImage(userId uint) error {
 
 func (u UserStore) RegisterUser(user User) error {
 	existedUser, err := u.GetUserByEmail(user.Email)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
@@ -385,11 +383,7 @@ func (u UserStore) getUserFromRow(row *sql.Row) (*User, error){
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, CustomError{
-				ErrUserNotfoundCode,
-				"user not found",
-				errors.Errorf("database error: %v", err),
-			}
+			return nil, err
 		}
 
 		return nil, CustomError {

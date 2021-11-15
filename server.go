@@ -1,64 +1,54 @@
 package main
 
 import (
-	"database/sql"
-	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi/v5"
-	"userland/api"
 	"userland/api/auth"
 	"userland/api/me"
 	"userland/api/middleware"
 	"userland/api/session"
+	"userland/store/broker"
 	"userland/store/postgres"
 	"userland/store/redis"
 )
 
 var router *chi.Mux
 
-func InitServer(db *sql.DB) *chi.Mux {
-	if router != nil{
+func InitRouter(
+	jwtHandler middleware.JwtHandlerInterface,
+	cache redis.CacheInterface,
+	fileHelper me.FileHelperInterface,
+	userStore postgres.UserStoreInterface,
+	authStore redis.AuthStoreInterface,
+	sessionStore postgres.SessionStoreInterface,
+	tfaStore postgres.TfaStoreInterface,
+	broker broker.MessageBrokerInterface,
+) *chi.Mux {
+	if router != nil {
 		return router
 	}
-
-	jwtConfig := middleware.NewJWTConfig(
-			"asdf",
-			api.RefreshTokenExpTime,
-			api.AccessTokenExpTime,
-			jwt.SigningMethodHS256,
-		)
-
-	jwtHandler := middleware.NewJWTHandler(jwtConfig)
-
-	redisClient := redis.InitRedisCache()
-	cache := redis.NewRedisCacheStore(redisClient)
-
-	authStore := redis.NewAuthStore(cache)
-	userStore := postgres.NewUserStore(db)
-	sessionStore := postgres.NewSessionStore(db)
-	tfaStore := postgres.NewTfaStore(db)
-	fileHelper := me.FileHelper{}
-
 	router = chi.NewMux()
 	authMiddleware := middleware.NewAuthMiddleware(jwtHandler, cache)
 
 	router.Get("/asset/{filename}", me.ShowImages(fileHelper))
 
 	router.Route("/auth", func(r chi.Router) {
-		r.With(middleware.RequestMustBeJsonMiddleware).Post("/register", auth.Register(userStore, authStore))
-		r.With(middleware.RequestMustBeJsonMiddleware).Post("/verification", auth.RequestVerification(userStore, authStore))
+		r.Post("/register", auth.Register(userStore, authStore))
+		r.Post("/verification", auth.RequestVerification(userStore, authStore))
 		r.Get("/verify/{token}", auth.VerifyRegister(userStore, authStore))
+
 		r.With(middleware.RequestMustBeJsonMiddleware).Post("/password/forgot", auth.ForgetPassword(userStore, authStore))
 		r.With(middleware.RequestMustBeJsonMiddleware).Post("/password/reset", auth.ResetPassword(userStore, authStore))
-		r.With(middleware.RequestMustBeJsonMiddleware).Post("/login", auth.Login(userStore, jwtHandler, sessionStore, authStore))
+		r.With(middleware.RequestMustBeJsonMiddleware).Post("/login", auth.Login(userStore, jwtHandler, sessionStore, authStore, broker))
 		r.With(middleware.RequestMustBeJsonMiddleware, authMiddleware.UserAuthMiddleware).Post("/tfa/verify", auth.VerifyTfa(jwtHandler, userStore, tfaStore))
 		r.With(middleware.RequestMustBeJsonMiddleware, authMiddleware.UserAuthMiddleware).Post("/tfa/bypass", auth.BypassTfa(jwtHandler, tfaStore))
 	})
 
 	router.Route("/me", func(r chi.Router) {
 		r.Use(authMiddleware.UserAuthMiddleware, middleware.TfaRequiredMiddleware)
+
 		r.Get("/session", session.ListSession(sessionStore))
-		r.With(middleware.RequestMustBeJsonMiddleware).Delete("/session", session.EndSession(sessionStore, cache))
-		r.With(middleware.RequestMustBeJsonMiddleware).Delete("/session/other", session.EndAllOtherSessions(sessionStore, cache))
+		r.Delete("/session", session.EndSession(sessionStore, cache))
+		r.Delete("/session/other", session.EndAllOtherSessions(sessionStore, cache))
 		r.Get("/session/refresh-token", session.RefreshToken(jwtHandler))
 		r.Get("/session/access-token", session.NewAccessToken(jwtHandler))
 
@@ -73,12 +63,14 @@ func InitServer(db *sql.DB) *chi.Mux {
 		r.Get("/tfa/status", me.GetCurrentTfaStatus(userStore))
 		r.Get("/tfa/enroll", me.SetupTfa(userStore))
 		r.With(middleware.RequestMustBeJsonMiddleware).Post("/tfa/enroll", me.ActivateTfa(tfaStore))
-		r.With(middleware.RequestMustBeJsonMiddleware).Post("/tfa/remove", me.RemoveTfa(userStore, tfaStore))
-
-		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
-		r.Delete("/picture", me.DeleteImages(userStore))
+		r.Post("/tfa/remove", me.RemoveTfa(userStore, tfaStore))
 
 		r.With(middleware.RequestMustBeJsonMiddleware).Post("/delete", me.DeleteAccount(userStore))
+
+
+		r.Delete("/picture", me.DeleteImages(userStore))
+		r.Post("/picture", me.UploadPhoto(userStore, fileHelper))
+
 	})
 
 	return router
